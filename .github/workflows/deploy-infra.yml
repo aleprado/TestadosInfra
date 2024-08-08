@@ -17,7 +17,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v0
         with:
           version: 'latest'
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          service_account_key: ${{ secrets.GCP_SA_KEY_BASE64 }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Set up Terraform
@@ -25,10 +25,10 @@ jobs:
         with:
           terraform_version: 1.0.0
 
-      - name: Export GCP credentials to file
+      - name: Decode and Export GCP credentials to file
         run: |
-          echo "${{ secrets.GCP_SA_KEY }}" > "${HOME}/gcp-key.json"
-          cat "${HOME}/gcp-key.json" # Añadido para verificar el contenido
+          echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 --decode > "${HOME}/gcp-key.json"
+          cat "${HOME}/gcp-key.json" # Verificar el contenido del archivo
         shell: bash
 
       - name: Validate JSON format
