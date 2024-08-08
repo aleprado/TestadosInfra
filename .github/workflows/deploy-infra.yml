@@ -28,7 +28,12 @@ jobs:
       - name: Export GCP credentials to file
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > "${HOME}/gcp-key.json"
-          cat "${HOME}/gcp-key.json"
+          cat "${HOME}/gcp-key.json" # Añadido para verificar el contenido
+        shell: bash
+
+      - name: Validate JSON format
+        run: |
+          python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
       - name: Initialize Terraform
