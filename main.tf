@@ -30,11 +30,3 @@ resource "google_cloudfunctions_function" "csv_processor" {
     GOOGLE_RUNTIME = "python310"
   }
 }
-
-output "bucket_name" {
-  value = google_storage_bucket.data_bucket.name
-}
-
-output "function_name" {
-  value = google_cloudfunctions_function.csv_processor.name
-}

@@ -13,5 +13,5 @@ variable "region" {
 variable "bucket_name" {
   description = "El nombre del bucket de Cloud Storage"
   type        = string
-  default     = testados-rutas
+  default     = "estado-eb18c.appspot.com"
 }
