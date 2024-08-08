@@ -15,3 +15,9 @@ variable "bucket_name" {
   type        = string
   default     = "estado-eb18c.appspot.com"
 }
+
+variable "credentials_file" {
+  description = "La ruta al archivo de credenciales de GCP"
+  type        = string
+  default     = ""
+}

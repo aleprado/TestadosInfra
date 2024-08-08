@@ -10,9 +10,7 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8fa5f296-be5d-4ed9-a893-92c2cf1eeb86" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/main.tf" beforeDir="false" afterPath="$PROJECT_DIR$/main.tf" afterDir="false" />
-    </list>
+    <list default="true" id="8fa5f296-be5d-4ed9-a893-92c2cf1eeb86" name="Default Changelist" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -56,7 +54,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1723147022871</updated>
-      <workItem from="1723147027738" duration="2144000" />
+      <workItem from="1723147027738" duration="2453000" />
     </task>
     <servers />
   </component>

@@ -5,7 +5,7 @@ provider "google" {
 }
 
 resource "google_storage_bucket" "data_bucket" {
-  name     = "${var.bucket_name}"
+  name     = var.bucket_name
   location = var.region
 }
 
@@ -20,11 +20,12 @@ resource "google_cloudfunctions_function" "csv_processor" {
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.data_bucket.name
   source_archive_object = google_storage_bucket_object.upload_trigger.name
-  trigger_http          = false
+
   event_trigger {
     event_type = "google.storage.object.finalize"
     resource   = google_storage_bucket.data_bucket.name
   }
+
   entry_point = "process_csv"
   environment_variables = {
     GOOGLE_RUNTIME = "python310"

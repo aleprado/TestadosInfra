@@ -36,6 +36,6 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
 
       - name: Apply Terraform
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -var="credentials_file=${HOME}/gcp-key.json"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
