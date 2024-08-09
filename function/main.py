@@ -42,5 +42,12 @@ def process_csv(data, context):
 
     # Process each row in the CSV
     for idx, row in enumerate(csv_reader):
+        # Ensure 'estado_actual' column is present and set to an empty string if not present
+        if 'estado_actual' not in row:
+            row['estado_actual'] = ''
+
         # Create a new document with data from CSV row
-        doc_ref.document(f'doc_{idx}').set(row)
+        doc_ref.document(str(idx)).set(row)
+
+    # Optionally: return the number of documents created
+    return len(content)
