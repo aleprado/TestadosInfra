@@ -1,6 +1,6 @@
 output "bucket_name" {
   description = "El nombre del bucket de Cloud Storage creado"
-  value       = google_storage_bucket.data_bucket.name
+  value       = google_storage_bucket.data_bucket[0].name
 }
 
 output "function_name" {
