@@ -4,18 +4,17 @@ provider "google" {
   credentials = file(var.credentials_file)
 }
 
-# Bucket para almacenar la función
-resource "google_storage_bucket" "function_bucket" {
-  name     = var.function_bucket_name
-  location = var.region
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [name, location]
-  }
+# Detectar si el bucket para datos ya existe
+data "google_storage_bucket" "existing_data_bucket" {
+  name = var.data_bucket_name
 }
 
-# Bucket para almacenar los archivos que la función procesará
+# Detectar si el bucket para la función ya existe
+data "google_storage_bucket" "existing_function_bucket" {
+  name = var.function_bucket_name
+}
+
+# Crear el bucket para datos solo si no existe
 resource "google_storage_bucket" "data_bucket" {
   name     = var.data_bucket_name
   location = var.region
@@ -24,6 +23,21 @@ resource "google_storage_bucket" "data_bucket" {
     prevent_destroy = true
     ignore_changes  = [name, location]
   }
+
+  count = data.google_storage_bucket.existing_data_bucket.id == null ? 1 : 0
+}
+
+# Crear el bucket para la función solo si no existe
+resource "google_storage_bucket" "function_bucket" {
+  name     = var.function_bucket_name
+  location = var.region
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [name, location]
+  }
+
+  count = data.google_storage_bucket.existing_function_bucket.id == null ? 1 : 0
 }
 
 # Subir el archivo ZIP de la función al bucket de funciones
