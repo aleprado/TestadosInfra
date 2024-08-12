@@ -36,21 +36,16 @@ jobs:
           python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10'
-
       - name: Install Python dependencies
         run: |
+          cd function
           pip install --upgrade pip
-          pip install -r function/requirements.txt
-        working-directory: ./function
+          pip install -r requirements.txt
 
       - name: Create ZIP file for Cloud Function
         run: |
+          cd function
           zip -r function_trigger.zip * . -x '*.git*'
-        working-directory: ./function
 
       - name: Upload ZIP to Cloud Storage
         run: |
