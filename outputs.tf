@@ -1,6 +1,6 @@
 output "bucket_name" {
   description = "El nombre del bucket de Cloud Storage creado"
-  value       = google_storage_bucket.data_bucket[0].name
+  value       = length(google_storage_bucket.data_bucket) > 0 ? google_storage_bucket.data_bucket[0].name : data.google_storage_bucket.existing_data_bucket.name
 }
 
 output "function_name" {
