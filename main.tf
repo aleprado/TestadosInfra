@@ -45,13 +45,20 @@ resource "google_storage_bucket_object" "upload_trigger" {
   name   = "function_trigger.zip"
   bucket = google_storage_bucket.function_bucket[0].name
   source = "${path.module}/function/function_trigger.zip"
+
+  # Opcional: forzar la actualización si el archivo cambia
+  lifecycle {
+    replace_triggered_by = [
+      "${path.module}/function/function_trigger.zip"
+    ]
+  }
 }
 
 # Crear la función de Cloud Functions
 resource "google_cloudfunctions_function" "csv_processor" {
   name                  = "csvProcessor"
   runtime               = "python310"
-  source_archive_bucket = google_storage_bucket.function_bucket.name
+  source_archive_bucket = google_storage_bucket.function_bucket[0].name
   source_archive_object = google_storage_bucket_object.upload_trigger.name
   entry_point           = "process_csv"
   environment_variables = {
@@ -59,6 +66,6 @@ resource "google_cloudfunctions_function" "csv_processor" {
   }
   event_trigger {
     event_type = "google.storage.object.finalize"
-    resource   = google_storage_bucket.data_bucket.name
+    resource   = google_storage_bucket.data_bucket[0].name
   }
 }
