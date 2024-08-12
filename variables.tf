@@ -10,10 +10,16 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "bucket_name" {
-  description = "El nombre del bucket de Cloud Storage"
+variable "function_bucket_name" {
+  description = "El nombre del bucket para almacenar el archivo ZIP de la función"
   type        = string
   default     = "testados-functions"
+}
+
+variable "data_bucket_name" {
+  description = "El nombre del bucket para almacenar los archivos que la función procesará"
+  type        = string
+  default     = "testados-rutas"
 }
 
 variable "credentials_file" {
