@@ -36,6 +36,28 @@ jobs:
           python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r function/requirements.txt
+        working-directory: ./function
+
+      - name: Create ZIP file for Cloud Function
+        run: |
+          zip -r function_trigger.zip * . -x '*.git*'
+        working-directory: ./function
+
+      - name: Upload ZIP to Cloud Storage
+        run: |
+          gsutil cp function/function_trigger.zip gs://testados-functions/
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
+
       - name: Initialize Terraform
         run: terraform init
         env:
