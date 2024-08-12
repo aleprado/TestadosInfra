@@ -36,6 +36,18 @@ jobs:
           python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
+      # Primera fase de Terraform: Crear los buckets
+      - name: Initialize Terraform
+        run: terraform init
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
+
+      - name: Apply Terraform to create buckets
+        run: terraform apply -auto-approve -target=google_storage_bucket.function_bucket -target=google_storage_bucket.data_bucket
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
+
+      # Instalar dependencias y crear el archivo ZIP de la función
       - name: Install Python dependencies
         run: |
           cd function
@@ -47,18 +59,15 @@ jobs:
           cd function
           zip -r function_trigger.zip * . -x '*.git*'
 
-      - name: Upload ZIP to Cloud Storage
+      # Subir el archivo ZIP al bucket de funciones
+      - name: Upload ZIP to Function Bucket
         run: |
           gsutil cp function/function_trigger.zip gs://testados-functions/
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
 
-      - name: Initialize Terraform
-        run: terraform init
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
-
-      - name: Apply Terraform
-        run: terraform apply -auto-approve -var="credentials_file=${HOME}/gcp-key.json"
+      # Segunda fase de Terraform: Crear la función de Cloud Functions
+      - name: Apply Terraform to deploy function
+        run: terraform apply -auto-approve
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
