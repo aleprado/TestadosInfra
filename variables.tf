@@ -13,7 +13,7 @@ variable "region" {
 variable "bucket_name" {
   description = "El nombre del bucket de Cloud Storage"
   type        = string
-  default     = "testados-rutas"
+  default     = "testados-functions"
 }
 
 variable "credentials_file" {
