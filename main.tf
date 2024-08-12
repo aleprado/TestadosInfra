@@ -43,12 +43,6 @@ resource "google_storage_bucket_object" "upload_trigger" {
   name   = "function_trigger.zip"
   bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
   source = "${path.module}/function/function_trigger.zip"
-
-  lifecycle {
-    replace_triggered_by = [
-      "${path.module}/function/function_trigger.zip"
-    ]
-  }
 }
 
 # Crear la función de Cloud Functions
