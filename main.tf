@@ -43,7 +43,7 @@ resource "google_storage_bucket" "function_bucket" {
 # Subir el archivo ZIP de la función al bucket de funciones
 resource "google_storage_bucket_object" "upload_trigger" {
   name   = "function_trigger.zip"
-  bucket = google_storage_bucket.function_bucket.name
+  bucket = google_storage_bucket.function_bucket[0].name
   source = "${path.module}/function/function_trigger.zip"
 }
 
