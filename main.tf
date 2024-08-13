@@ -42,7 +42,7 @@ resource "google_storage_bucket" "function_bucket" {
 resource "google_storage_bucket_object" "upload_export_trigger" {
   name   = "export_trigger.zip"
   bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
-  source = "${path.module}/function/export.zip"
+  source = "${path.module}/function/export_trigger.zip"
 }
 
 # Crear la función de Cloud Functions para exportar subcolecciones
