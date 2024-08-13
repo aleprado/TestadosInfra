@@ -36,38 +36,31 @@ jobs:
           python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
+      - name: Install Python dependencies and create ZIPs
+        run: |
+          # Crear el ZIP para la función CSV Processor
+          cd function/csv_processor
+          pip install -r requirements.txt --target ./package
+          cd package
+          zip -r9 ../function_trigger.zip .
+          cd ..
+          zip -g function_trigger.zip main.py
+
+          # Crear el ZIP para la función Export Subcollections
+          cd ../export_subcollections
+          pip install -r requirements.txt --target ./package
+          cd package
+          zip -r9 ../export_trigger.zip .
+          cd ..
+          zip -g export_trigger.zip export_subcollections.py
+        shell: bash
+
       - name: Initialize Terraform
         run: terraform init
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
 
-      # Aplicar Terraform solo para crear los buckets
-      - name: Apply Terraform to create buckets
-        run: terraform apply -auto-approve -var="credentials_file=${HOME}/gcp-key.json" -target=google_storage_bucket.function_bucket -target=google_storage_bucket.data_bucket
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
-
-      # Instalar dependencias y crear el archivo ZIP de la función
-      - name: Install Python dependencies
-        run: |
-          cd function
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Create ZIP file for Cloud Function
-        run: |
-          cd function
-          zip -r function_trigger.zip * . -x '*.git*'
-
-      # Subir el archivo ZIP al bucket de funciones
-      - name: Upload ZIP to Function Bucket
-        run: |
-          gsutil cp function/function_trigger.zip gs://testados-functions/
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
-
-      # Aplicar Terraform para desplegar la función
-      - name: Apply Terraform to deploy function
+      - name: Apply Terraform
         run: terraform apply -auto-approve -var="credentials_file=${HOME}/gcp-key.json"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
