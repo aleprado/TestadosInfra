@@ -47,7 +47,7 @@ jobs:
           zip -g function_trigger.zip main.py
 
           # Crear el ZIP para la función Export Subcollections
-          cd ../export_subcollections
+          cd ../export
           pip install -r requirements.txt --target ./package
           cd package
           zip -r9 ../export_trigger.zip .
