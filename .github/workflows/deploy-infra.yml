@@ -52,7 +52,7 @@ jobs:
           cd package
           zip -r9 ../export_trigger.zip .
           cd ..
-          zip -g export_trigger.zip export_subcollections.py
+          zip -g export_trigger.zip main.py
         shell: bash
 
       - name: Initialize Terraform
