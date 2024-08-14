@@ -14,6 +14,11 @@ data "google_storage_bucket" "existing_function_bucket" {
   name = var.function_bucket_name
 }
 
+# Detectar si el bucket de datos ya existe
+data "google_storage_bucket" "existing_data_bucket" {
+  name = var.data_bucket_name
+}
+
 # Crear el bucket de exportación solo si no existe
 resource "google_storage_bucket" "export_bucket" {
   count    = data.google_storage_bucket.existing_export_bucket.id == null ? 1 : 0
@@ -65,7 +70,7 @@ resource "google_cloudfunctions_function" "csv_processor" {
 
   event_trigger {
     event_type = "google.storage.object.finalize"
-    resource   = google_storage_bucket.data_bucket[0].name
+    resource   = data.google_storage_bucket.existing_data_bucket.name
   }
 }
 
