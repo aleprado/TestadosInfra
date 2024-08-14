@@ -1,4 +1,4 @@
-¿output "data_bucket_name" {
+output "data_bucket_name" {
   description = "El nombre del bucket de Cloud Storage para datos"
   value       = google_storage_bucket.data_bucket[0].name
 }
