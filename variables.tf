@@ -10,22 +10,22 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "function_bucket_name" {
-  description = "El nombre del bucket de Cloud Storage para la función"
-  type        = string
-  default     = "testados-functions"
-}
-
-variable "data_bucket_name" {
-  description = "El nombre del bucket de Cloud Storage para datos"
+variable "bucket_name" {
+  description = "El nombre del bucket de Cloud Storage"
   type        = string
   default     = "testados-rutas"
 }
 
 variable "export_bucket_name" {
-  description = "El nombre del bucket de Cloud Storage para las exportaciones"
+  description = "El nombre del bucket de Cloud Storage para exportar subcolecciones"
   type        = string
   default     = "testados-rutas-exportadas"
+}
+
+variable "function_bucket_name" {
+  description = "El nombre del bucket de Cloud Storage para las funciones"
+  type        = string
+  default     = "testados-functions"
 }
 
 variable "credentials_file" {
