@@ -58,14 +58,14 @@ resource "google_storage_bucket" "export_bucket" {
 # Subir el archivo ZIP de la función CSV Processor al bucket de funciones
 resource "google_storage_bucket_object" "upload_csv_trigger" {
   name   = "function_trigger.zip"
-  bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
+  bucket = coalesce(google_storage_bucket.function_bucket.*.name[0], data.google_storage_bucket.existing_function_bucket.name)
   source = "${path.module}/function/csv_processor/function_trigger.zip"
 }
 
 # Subir el archivo ZIP de la función Export Subcollections al bucket de funciones
 resource "google_storage_bucket_object" "upload_export_trigger" {
   name   = "export_trigger.zip"
-  bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
+  bucket = coalesce(google_storage_bucket.function_bucket.*.name[0], data.google_storage_bucket.existing_function_bucket.name)
   source = "${path.module}/function/export/export_trigger.zip"
 }
 
@@ -77,12 +77,12 @@ resource "google_cloudfunctions_function" "csv_processor" {
   source_archive_object = google_storage_bucket_object.upload_csv_trigger.name
   entry_point           = "process_csv"
   environment_variables = {
-    DATA_BUCKET_NAME = length(google_storage_bucket.data_bucket) > 0 ? google_storage_bucket.data_bucket[0].name : data.google_storage_bucket.existing_data_bucket.name
+    DATA_BUCKET_NAME = coalesce(google_storage_bucket.data_bucket.*.name[0], data.google_storage_bucket.existing_data_bucket.name)
   }
 
   event_trigger {
     event_type = "google.storage.object.finalize"
-    resource   = google_storage_bucket.data_bucket[0].name
+    resource   = coalesce(google_storage_bucket.data_bucket.*.name[0], data.google_storage_bucket.existing_data_bucket.name)
   }
 }
 
@@ -94,7 +94,7 @@ resource "google_cloudfunctions_function" "export_csv" {
   source_archive_object = google_storage_bucket_object.upload_export_trigger.name
   entry_point           = "export_subcollections"
   environment_variables = {
-    EXPORT_BUCKET_NAME = length(google_storage_bucket.export_bucket) > 0 ? google_storage_bucket.export_bucket[0].name : data.google_storage_bucket.existing_export_bucket.name
+    EXPORT_BUCKET_NAME = coalesce(google_storage_bucket.export_bucket.*.name[0], data.google_storage_bucket.existing_export_bucket.name)
   }
 
   event_trigger {
