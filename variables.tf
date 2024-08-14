@@ -10,8 +10,8 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "bucket_name" {
-  description = "El nombre del bucket de Cloud Storage"
+variable "data_bucket_name" {
+  description = "El nombre del bucket de Cloud Storage para los datos"
   type        = string
   default     = "testados-rutas"
 }
