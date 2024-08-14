@@ -1,16 +1,16 @@
 output "data_bucket_name" {
   description = "El nombre del bucket de Cloud Storage para datos"
-  value       = google_storage_bucket.data_bucket[0].name
+  value       = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
 }
 
 output "function_bucket_name" {
   description = "El nombre del bucket de Cloud Storage para funciones"
-  value       = google_storage_bucket.function_bucket[0].name
+  value       = coalesce(data.google_storage_bucket.existing_function_bucket.name, var.function_bucket_name)
 }
 
 output "export_bucket_name" {
   description = "El nombre del bucket de Cloud Storage para exportaciones"
-  value       = google_storage_bucket.export_bucket[0].name
+  value       = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
 }
 
 output "csv_processor_function_name" {
