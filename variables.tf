@@ -16,16 +16,16 @@ variable "data_bucket_name" {
   default     = "testados-rutas"
 }
 
-variable "export_bucket_name" {
-  description = "El nombre del bucket de Cloud Storage para exportar subcolecciones"
-  type        = string
-  default     = "testados-rutas-exportadas"
-}
-
 variable "function_bucket_name" {
-  description = "El nombre del bucket de Cloud Storage para las funciones"
+  description = "El nombre del bucket de Cloud Storage para funciones"
   type        = string
   default     = "testados-functions"
+}
+
+variable "export_bucket_name" {
+  description = "El nombre del bucket de Cloud Storage para exportaciones"
+  type        = string
+  default     = "testados-rutas-exportadas"
 }
 
 variable "credentials_file" {
