@@ -1,49 +1,48 @@
-import os
 import csv
+import os
 from google.cloud import firestore, storage
 
-def export_subcollections(data, context):
-    # Inicializar clientes de Firestore y Cloud Storage
+def export_subcollections(event, context):
+    # Inicializar clientes Firestore y Storage
     firestore_client = firestore.Client()
     storage_client = storage.Client()
 
-    # Obtener el nombre del cliente desde el contexto
-    cliente_id = 'Cliente 1'  # En este ejemplo estamos usando un cliente fijo, puedes adaptarlo a tus necesidades
+    # Obtener el nombre del bucket donde se almacenarán los archivos exportados
+    export_bucket_name = os.environ['EXPORT_BUCKET_NAME']
+    export_bucket = storage_client.bucket(export_bucket_name)
 
-    # Referencia a la colección del cliente en Firestore
-    rutas_ref = firestore_client.collection('Rutas').document(cliente_id)
+    # Obtener todas las colecciones de "Rutas"
+    rutas_collection = firestore_client.collection('Rutas')
+    clientes = rutas_collection.stream()
 
-    # Obtener todas las subcolecciones (las rutas)
-    subcollections = rutas_ref.collections()
+    for cliente in clientes:
+        cliente_id = cliente.id
+        subcollections = cliente.reference.collections()
 
-    # Crear un bucket en Cloud Storage
-    bucket_name = os.environ.get('EXPORT_BUCKET_NAME')
-    bucket = storage_client.bucket(bucket_name)
-
-    for subcollection in subcollections:
-        # Obtener el nombre de la subcolección (que será el nombre del archivo CSV)
-        subcollection_name = subcollection.id
-        csv_filename = f"{cliente_id}/{subcollection_name}.csv"
-
-        # Crear un archivo temporal
-        temp_file_path = f"/tmp/{subcollection_name}.csv"
-        with open(temp_file_path, mode='w', newline='') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            
-            # Escribir encabezados en el CSV
+        # Crear una carpeta para cada cliente dentro del bucket
+        for subcollection in subcollections:
+            subcollection_name = subcollection.id
             documents = subcollection.stream()
-            first_doc = next(documents)
-            headers = list(first_doc.to_dict().keys())
-            csv_writer.writerow(headers)
 
-            # Escribir las filas en el CSV
-            csv_writer.writerow(first_doc.to_dict().values())
-            for doc in documents:
-                csv_writer.writerow(doc.to_dict().values())
+            # Ordenar los documentos por el ID del documento, asumiendo que es numérico
+            sorted_docs = sorted(documents, key=lambda d: int(d.id))
 
-        # Subir el archivo CSV al bucket en Cloud Storage
-        blob = bucket.blob(csv_filename)
-        blob.upload_from_filename(temp_file_path)
+            # Crear un archivo CSV con el nombre de la subcolección
+            file_name = f'{cliente_id}/{subcollection_name}.csv'
+            blob = export_bucket.blob(file_name)
 
-        # Eliminar el archivo temporal
-        os.remove(temp_file_path)
+            # Crear el archivo CSV en la memoria y escribir los datos ordenados
+            with blob.open("wt", newline='') as csv_file:
+                writer = csv.writer(csv_file)
+                header_written = False
+                for doc in sorted_docs:
+                    if not header_written:
+                        # Escribir el encabezado en el CSV
+                        writer.writerow(doc.to_dict().keys())
+                        header_written = True
+                    # Escribir los valores del documento en el CSV
+                    writer.writerow(doc.to_dict().values())
+
+            print(f'Subcolección {subcollection_name} exportada a {file_name}')
+
+    print('Exportación completada.')
