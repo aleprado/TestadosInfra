@@ -38,11 +38,35 @@ resource "google_storage_bucket" "function_bucket" {
   }
 }
 
-# Subir el archivo ZIP de la nueva función al bucket de funciones
+# Subir el archivo ZIP de la función CSV Processor al bucket de funciones
+resource "google_storage_bucket_object" "upload_csv_processor_trigger" {
+  name   = "function_trigger.zip"
+  bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
+  source = "${path.module}/function/csv_processor/function_trigger.zip"
+}
+
+# Subir el archivo ZIP de la función Export al bucket de funciones
 resource "google_storage_bucket_object" "upload_export_trigger" {
   name   = "export_trigger.zip"
   bucket = length(google_storage_bucket.function_bucket) > 0 ? google_storage_bucket.function_bucket[0].name : data.google_storage_bucket.existing_function_bucket.name
-  source = "${path.module}/function/export_trigger.zip"
+  source = "${path.module}/function/export/export_trigger.zip"
+}
+
+# Crear la función de Cloud Functions para procesar CSV
+resource "google_cloudfunctions_function" "csv_processor" {
+  name                  = "csvProcessor"
+  runtime               = "python310"
+  source_archive_bucket = google_storage_bucket_object.upload_csv_processor_trigger.bucket
+  source_archive_object = google_storage_bucket_object.upload_csv_processor_trigger.name
+  entry_point           = "process_csv"
+  environment_variables = {
+    GOOGLE_RUNTIME = "python310"
+  }
+
+  event_trigger {
+    event_type = "google.storage.object.finalize"
+    resource   = google_storage_bucket.data_bucket[0].name
+  }
 }
 
 # Crear la función de Cloud Functions para exportar subcolecciones
