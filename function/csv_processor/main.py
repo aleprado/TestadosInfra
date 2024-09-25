@@ -3,9 +3,6 @@ import os
 from google.cloud import firestore, storage
 
 def detect_delimiter(sample: str) -> str:
-    """
-    Detect the delimiter used in the sample string.
-    """
     if ';' in sample:
         return ';'
     elif ',' in sample:
@@ -34,25 +31,30 @@ def process_csv(data, context):
     # Parse the CSV content with the detected delimiter
     csv_reader = csv.DictReader(content, delimiter=delimiter)
 
-    # Extract file name without extension for sub-collection name
-    sub_collection_name = os.path.splitext(file_name)[0]
+    # Extract base file name without extension for sub-collection name
+    sub_collection_name = os.path.splitext(os.path.basename(file_name))[0]
 
-    # Reference to Firestore document
-    doc_ref = firestore_client.collection('Rutas').document('Cliente 1').collection(sub_collection_name)
+    # Extract client name from file path
+    parts = file_name.split('/')
+    if len(parts) >= 2:
+        client_name = parts[0]
+    else:
+        client_name = 'Cliente 1'  # Default client name or handle accordingly
+
+    # Reference to Firestore sub-collection
+    doc_ref = firestore_client.collection('Rutas').document(client_name).collection(sub_collection_name)
 
     # Process each row in the CSV
     for idx, row in enumerate(csv_reader):
-        # Ensure 'estado_actual' column is present and set to an empty string if not present
         if 'estado_actual' not in row:
             row['estado_actual'] = ''
-        
         # Create a new document with data from CSV row
         doc_ref.document(str(idx)).set(row)
-    
-    # Update the 'nombres' array in the 'Cliente 1' document
-    client_doc_ref = firestore_client.collection('Rutas').document('Cliente 1')
-    client_doc_ref.update({
+
+    # Update the 'nombres' array in the client's document
+    client_doc_ref = firestore_client.collection('Rutas').document(client_name)
+    client_doc_ref.set({
         'nombres': firestore.ArrayUnion([sub_collection_name])
-    })
+    }, merge=True)
 
     return len(content)
