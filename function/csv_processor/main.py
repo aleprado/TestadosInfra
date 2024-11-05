@@ -31,30 +31,24 @@ def process_csv(data, context):
     # Parse the CSV content with the detected delimiter
     csv_reader = csv.DictReader(content, delimiter=delimiter)
 
-    # Extract base file name without extension for sub-collection name
-    sub_collection_name = os.path.splitext(os.path.basename(file_name))[0]
+    # Extract base file name without extension for the document name
+    document_name = os.path.splitext(os.path.basename(file_name))[0]
 
-    # Extract client name from file path
-    parts = file_name.split('/')
-    if len(parts) >= 2:
-        client_name = parts[0]
-    else:
-        client_name = 'Cliente 1'  # Default client name or handle accordingly
+    # Reference to Firestore document
+    doc_ref = firestore_client.collection('Rutas').document(document_name)
 
-    # Reference to Firestore sub-collection
-    doc_ref = firestore_client.collection('Rutas').document(client_name).collection(sub_collection_name)
+    # Set the fields "cliente" and "localidad" at the document level
+    doc_ref.set({
+        'cliente': bucket_name,
+        'localidad': 'Localidad Fija'  # Temporarily hardcoded value for "localidad"
+    }, merge=True)
 
-    # Process each row in the CSV
+    # Process each row in the CSV and save in the sub-collection as the "RutaRecorrido"
+    sub_collection_ref = doc_ref.collection('RutaRecorrido')
     for idx, row in enumerate(csv_reader):
         if 'estado_actual' not in row:
             row['estado_actual'] = ''
-        # Create a new document with data from CSV row
-        doc_ref.document(str(idx)).set(row)
-
-    # Update the 'nombres' array in the client's document
-    client_doc_ref = firestore_client.collection('Rutas').document(client_name)
-    client_doc_ref.set({
-        'nombres': firestore.ArrayUnion([sub_collection_name])
-    }, merge=True)
+        # Create a new document in the sub-collection with data from CSV row
+        sub_collection_ref.document(str(idx)).set(row)
 
     return len(content)
