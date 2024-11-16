@@ -36,14 +36,10 @@ def process_csv(data, context):
 
     # Extract the client name from the folder structure in the bucket path
     folder_parts = file_name.split('/')
-    client_name = None
-    if 'Clientes' in folder_parts:
-        clientes_index = folder_parts.index('Clientes')
-        if clientes_index + 1 < len(folder_parts):
-            client_name = folder_parts[clientes_index + 1]
-
-    if not client_name:
-        raise ValueError('Invalid file path structure. Expected "Clientes/<client_name>/..." format.')
+    if len(folder_parts) > 1:
+        client_name = folder_parts[-2]  # Assume the client name is the last folder before the file name
+    else:
+        raise ValueError('Invalid file path structure. Expected at least one folder before the file name.')
 
     # Reference to Firestore document
     doc_ref = firestore_client.collection('Rutas').document(document_name)
