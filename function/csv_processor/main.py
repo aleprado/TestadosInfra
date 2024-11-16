@@ -34,11 +34,15 @@ def process_csv(data, context):
     # Extract base file name without extension for the document name
     document_name = os.path.splitext(os.path.basename(file_name))[0]
 
-    # Extract the client name from the folder structure in the bucket path (e.g., "Rutas/clientes/Pedro/file.csv" -> "Pedro")
+    # Extract the client name from the folder structure in the bucket path
     folder_parts = file_name.split('/')
-    if len(folder_parts) > 1 and folder_parts[0] == 'Clientes':
-        client_name = folder_parts[1]
-    else:
+    client_name = None
+    if 'Clientes' in folder_parts:
+        clientes_index = folder_parts.index('Clientes')
+        if clientes_index + 1 < len(folder_parts):
+            client_name = folder_parts[clientes_index + 1]
+
+    if not client_name:
         raise ValueError('Invalid file path structure. Expected "Clientes/<client_name>/..." format.')
 
     # Reference to Firestore document
