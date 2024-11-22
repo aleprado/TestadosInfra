@@ -41,22 +41,34 @@ def process_csv(data, context):
     else:
         raise ValueError('Invalid file path structure. Expected at least one folder before the file name.')
 
-    # Reference to Firestore document
-    doc_ref = firestore_client.collection('Rutas').document(document_name)
+    # Determine the locality name (you can adjust this if you have another source for this information)
+    if len(folder_parts) > 2:
+        locality_name = folder_parts[-3]  # Assume locality is part of the folder structure
+    else:
+        raise ValueError('Invalid file path structure. Expected a locality folder before the client folder.')
 
-    # Set the fields "cliente" and "localidad" at the document level
+    # Firestore references
     client_ref = firestore_client.collection('Clientes').document(client_name)
-    doc_ref.set({
+    locality_ref = client_ref.collection('Localidades').document(locality_name)
+    ruta_ref = firestore_client.collection('Rutas').document(document_name)
+
+    # Save metadata in the route document
+    ruta_ref.set({
         'cliente': client_ref,
-        'localidad': 'Localidad Fija'  # Temporarily hardcoded value for "localidad"
+        'localidad': locality_ref
     }, merge=True)
 
-    # Process each row in the CSV and save in the sub-collection as the "RutaRecorrido"
-    sub_collection_ref = doc_ref.collection('RutaRecorrido')
+    # Add a reference to the route in the client's locality sub-collection
+    locality_ref.set({
+        'rutas': firestore.ArrayUnion([ruta_ref])
+    }, merge=True)
+
+    # Process each row in the CSV and save it in the sub-collection "RutaRecorrido"
+    sub_collection_ref = ruta_ref.collection('RutaRecorrido')
     for idx, row in enumerate(csv_reader):
         if 'estado_actual' not in row:
-            row['estado_actual'] = ''
-        # Create a new document in the sub-collection with data from CSV row
+            row['estado_actual'] = ''  # Default value if not provided
         sub_collection_ref.document(str(idx)).set(row)
 
+    print(f"Processed {len(content)} lines from {file_name}.")
     return len(content)
