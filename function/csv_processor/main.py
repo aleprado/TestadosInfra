@@ -41,11 +41,9 @@ def process_csv(data, context):
     else:
         raise ValueError('Invalid file path structure. Expected at least one folder before the file name.')
 
-    # Determine the locality name (you can adjust this if you have another source for this information)
-    if len(folder_parts) > 2:
-        locality_name = folder_parts[-3]  # Assume locality is part of the folder structure
-    else:
-        raise ValueError('Invalid file path structure. Expected a locality folder before the client folder.')
+    # **Specify the locality manually or use a default value**
+    # Replace "Buenos Aires" with a dynamic method to get the locality if available
+    locality_name = "Buenos Aires"
 
     # Firestore references
     client_ref = firestore_client.collection('Clientes').document(client_name)
