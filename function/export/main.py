@@ -27,15 +27,24 @@ def export_subcollections(event, context):
             # Ordenar los documentos por el ID del documento, asumiendo que es numérico
             sorted_docs = sorted(documents, key=lambda d: int(d.id))
 
-            # Crear un archivo CSV con el nombre de la subcolección
-            file_name = f'{cliente_id}/{subcollection_name}.csv'
-            blob = export_bucket.blob(file_name)
+            total_docs = len(sorted_docs)
+            completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('estado_actual'))
+            completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
 
-            # Crear el archivo CSV en la memoria y escribir los datos ordenados
-            with blob.open("wt", newline='') as csv_file:
-                writer = csv.writer(csv_file)
-                header_written = False
-                for doc in sorted_docs:
+            # Actualizar el campo 'completada' en el documento del cliente
+            cliente.reference.update({'completada': completion_percentage})
+
+            for doc in sorted_docs:
+                documento_id = doc.id
+
+                # Crear un archivo CSV con el nombre adecuado según el cliente y el documento
+                file_name = f'{cliente_id}/{documento_id}.csv'
+                blob = export_bucket.blob(file_name)
+
+                # Crear el archivo CSV en la memoria y escribir los datos del documento
+                with blob.open("wt", newline='') as csv_file:
+                    writer = csv.writer(csv_file)
+                    header_written = False
                     if not header_written:
                         # Escribir el encabezado en el CSV
                         writer.writerow(doc.to_dict().keys())
@@ -43,6 +52,6 @@ def export_subcollections(event, context):
                     # Escribir los valores del documento en el CSV
                     writer.writerow(doc.to_dict().values())
 
-            print(f'Subcolección {subcollection_name} exportada a {file_name}')
+                print(f'Documento {documento_id} exportado a {file_name}')
 
     print('Exportación completada.')
