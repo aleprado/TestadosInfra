@@ -27,31 +27,35 @@ def export_subcollections(event, context):
             print(f"La ruta {ruta_id} no tiene referencias de cliente o localidad.")
             continue
 
+        # Obtener IDs legibles para cliente y localidad
+        cliente_id = cliente_ref.id if isinstance(cliente_ref, firestore.DocumentReference) else str(cliente_ref)
+        localidad_id = localidad_ref.id if isinstance(localidad_ref, firestore.DocumentReference) else str(localidad_ref)
+
         # Obtener las subcolecciones dentro de la ruta
         subcollections = ruta.reference.collections()
 
-        for subcollection in subcollections:
-            subcollection_name = subcollection.id
-            documents = subcollection.stream()
+        # Crear un archivo CSV único para la ruta
+        file_name = f'testados-rutas-exportadas/{cliente_id}/{localidad_id}/{ruta_id}.csv'
+        blob = export_bucket.blob(file_name)
 
-            # Ordenar los documentos por el ID del documento, asumiendo que es numérico
-            sorted_docs = sorted(documents, key=lambda d: int(d.id))
+        with blob.open("wt", newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            header_written = False
 
-            # Calcular el porcentaje de documentos completados
-            total_docs = len(sorted_docs)
-            completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('estado_actual'))
-            completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
+            for subcollection in subcollections:
+                documents = subcollection.stream()
 
-            # Actualizar el campo 'completado' en la ruta
-            ruta.reference.update({'completado': completion_percentage})
+                # Ordenar los documentos por el ID del documento, asumiendo que es numérico
+                sorted_docs = sorted(documents, key=lambda d: int(d.id))
 
-            # Crear un archivo CSV con los datos de la subcolección
-            file_name = f'{cliente_ref}/{localidad_ref}/{ruta_id}.csv'
-            blob = export_bucket.blob(file_name)
+                # Calcular el porcentaje de documentos completados
+                total_docs = len(sorted_docs)
+                completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('estado_actual'))
+                completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
 
-            with blob.open("wt", newline='') as csv_file:
-                writer = csv.writer(csv_file)
-                header_written = False
+                # Actualizar el campo 'completado' en la ruta
+                ruta.reference.update({'completado': completion_percentage})
+
                 for doc in sorted_docs:
                     if not header_written:
                         # Escribir el encabezado en el CSV
