@@ -13,13 +13,23 @@ def export_subcollections(event, context):
 
     # Obtener todas las colecciones de "Rutas"
     rutas_collection = firestore_client.collection('Rutas')
-    clientes = rutas_collection.stream()
+    rutas = rutas_collection.stream()
 
-    for cliente in clientes:
-        cliente_id = cliente.id
-        subcollections = cliente.reference.collections()
+    for ruta in rutas:
+        ruta_id = ruta.id
+        ruta_data = ruta.to_dict()
 
-        # Crear una carpeta para cada cliente dentro del bucket
+        # Obtener las referencias a cliente y localidad
+        cliente_ref = ruta_data.get('cliente')
+        localidad_ref = ruta_data.get('localidad')
+
+        if not cliente_ref or not localidad_ref:
+            print(f"La ruta {ruta_id} no tiene referencias de cliente o localidad.")
+            continue
+
+        # Obtener las subcolecciones dentro de la ruta
+        subcollections = ruta.reference.collections()
+
         for subcollection in subcollections:
             subcollection_name = subcollection.id
             documents = subcollection.stream()
@@ -27,24 +37,22 @@ def export_subcollections(event, context):
             # Ordenar los documentos por el ID del documento, asumiendo que es numérico
             sorted_docs = sorted(documents, key=lambda d: int(d.id))
 
+            # Calcular el porcentaje de documentos completados
             total_docs = len(sorted_docs)
             completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('estado_actual'))
             completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
 
-            # Actualizar el campo 'completada' en el documento del cliente
-            cliente.reference.update({'completada': completion_percentage})
+            # Actualizar el campo 'completado' en la ruta
+            ruta.reference.update({'completado': completion_percentage})
 
-            for doc in sorted_docs:
-                documento_id = doc.id
+            # Crear un archivo CSV con los datos de la subcolección
+            file_name = f'{cliente_ref}/{localidad_ref}/{ruta_id}.csv'
+            blob = export_bucket.blob(file_name)
 
-                # Crear un archivo CSV con el nombre adecuado según el cliente y el documento
-                file_name = f'{cliente_id}/{documento_id}.csv'
-                blob = export_bucket.blob(file_name)
-
-                # Crear el archivo CSV en la memoria y escribir los datos del documento
-                with blob.open("wt", newline='') as csv_file:
-                    writer = csv.writer(csv_file)
-                    header_written = False
+            with blob.open("wt", newline='') as csv_file:
+                writer = csv.writer(csv_file)
+                header_written = False
+                for doc in sorted_docs:
                     if not header_written:
                         # Escribir el encabezado en el CSV
                         writer.writerow(doc.to_dict().keys())
@@ -52,6 +60,6 @@ def export_subcollections(event, context):
                     # Escribir los valores del documento en el CSV
                     writer.writerow(doc.to_dict().values())
 
-                print(f'Documento {documento_id} exportado a {file_name}')
+            print(f'Ruta {ruta_id} exportada a {file_name} con porcentaje completado: {completion_percentage:.2f}%')
 
     print('Exportación completada.')
