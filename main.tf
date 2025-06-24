@@ -4,6 +4,18 @@ provider "google" {
   credentials = file(var.credentials_file)
 }
 
+# Retrieve current project information for IAM bindings
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+# Allow the Cloud Storage service account to publish events for CloudEvent triggers
+resource "google_project_iam_member" "gcs_pubsub_publisher" {
+  project = data.google_project.current.project_id
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:service-${data.google_project.current.number}@gs-project-accounts.iam.gserviceaccount.com"
+}
+
 # Detectar si el bucket de datos ya existe
 data "google_storage_bucket" "existing_data_bucket" {
   name = var.data_bucket_name
