@@ -34,16 +34,16 @@ def process_csv(data, context):
     # Extract base file name without extension for the document name
     document_name = os.path.splitext(os.path.basename(file_name))[0]
 
-    # Extract the client name from the folder structure in the bucket path
+    # Extract client and locality names from the folder structure in the bucket path
     folder_parts = file_name.split('/')
-    if len(folder_parts) > 1:
-        client_name = folder_parts[-2]  # Assume the client name is the last folder before the file name
+    if len(folder_parts) >= 3:
+        # The expected structure is <cliente>/<localidad>/<archivo>
+        client_name = folder_parts[0]
+        locality_name = folder_parts[1]
     else:
-        raise ValueError('Invalid file path structure. Expected at least one folder before the file name.')
-
-    # **Specify the locality manually or use a default value**
-    # Replace "Buenos Aires" with a dynamic method to get the locality if available
-    locality_name = "Buenos Aires"
+        raise ValueError(
+            'Invalid file path structure. Expected at least cliente/localidad/archivo'
+        )
 
     # Firestore references
     client_ref = firestore_client.collection('Clientes').document(client_name)
