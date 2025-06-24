@@ -56,52 +56,89 @@ resource "google_storage_bucket" "export_bucket" {
 }
 
 # Subir el archivo ZIP de la función CSV Processor al bucket de funciones
+data "archive_file" "csv_processor_src" {
+  type        = "zip"
+  source_dir  = "${path.module}/function/csv_processor"
+  output_path = "${path.module}/function/csv_processor/function_trigger.zip"
+}
+
 resource "google_storage_bucket_object" "upload_csv_trigger" {
-  name   = "function_trigger.zip"
-  bucket = data.google_storage_bucket.existing_function_bucket.name
-  source = "${path.module}/function/csv_processor/function_trigger.zip"
+  name       = "function_trigger.zip"
+  bucket     = data.google_storage_bucket.existing_function_bucket.name
+  source     = data.archive_file.csv_processor_src.output_path
   depends_on = [google_storage_bucket.function_bucket]
 }
 
 # Subir el archivo ZIP de la función Export Subcollections al bucket de funciones
+data "archive_file" "export_src" {
+  type        = "zip"
+  source_dir  = "${path.module}/function/export"
+  output_path = "${path.module}/function/export/export_trigger.zip"
+}
+
 resource "google_storage_bucket_object" "upload_export_trigger" {
-  name   = "export_trigger.zip"
-  bucket = data.google_storage_bucket.existing_function_bucket.name
-  source = "${path.module}/function/export/export_trigger.zip"
+  name       = "export_trigger.zip"
+  bucket     = data.google_storage_bucket.existing_function_bucket.name
+  source     = data.archive_file.export_src.output_path
   depends_on = [google_storage_bucket.function_bucket]
 }
 
 # Crear la función de Cloud Functions para procesar CSVs
-resource "google_cloudfunctions_function" "csv_processor" {
-  name                  = "csvProcessor"
-  runtime               = "python310"
-  source_archive_bucket = google_storage_bucket_object.upload_csv_trigger.bucket
-  source_archive_object = google_storage_bucket_object.upload_csv_trigger.name
-  entry_point           = "process_csv"
-  environment_variables = {
-    DATA_BUCKET_NAME = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+resource "google_cloudfunctions2_function" "csv_processor" {
+  name     = "csvProcessor"
+  location = var.region
+
+  build_config {
+    runtime     = "python310"
+    entry_point = "process_csv"
+    source {
+      storage_source {
+        bucket = google_storage_bucket_object.upload_csv_trigger.bucket
+        object = google_storage_bucket_object.upload_csv_trigger.name
+      }
+    }
+  }
+
+  service_config {
+    runtime          = "python310"
+    available_memory = "256M"
   }
 
   event_trigger {
-    event_type = "google.storage.object.finalize"
-    resource   = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+    trigger_region = var.region
+    event_type     = "google.cloud.storage.object.v1.finalized"
+    event_filters {
+      attribute = "bucket"
+      value     = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+    }
   }
 }
 
 # Crear la función de Cloud Functions para exportar subcolecciones
-resource "google_cloudfunctions_function" "export_csv" {
-  name                  = "exportCSV"
-  runtime               = "python310"
-  source_archive_bucket = google_storage_bucket_object.upload_export_trigger.bucket
-  source_archive_object = google_storage_bucket_object.upload_export_trigger.name
-  entry_point           = "export_subcollections"
-  environment_variables = {
-    EXPORT_BUCKET_NAME = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+resource "google_cloudfunctions2_function" "export_csv" {
+  name     = "exportCSV"
+  location = var.region
+
+  build_config {
+    runtime     = "python310"
+    entry_point = "export_subcollections"
+    source {
+      storage_source {
+        bucket = google_storage_bucket_object.upload_export_trigger.bucket
+        object = google_storage_bucket_object.upload_export_trigger.name
+      }
+    }
+  }
+
+  service_config {
+    runtime          = "python310"
+    available_memory = "256M"
   }
 
   event_trigger {
-    event_type = "google.pubsub.topic.publish"
-    resource   = google_pubsub_topic.export_topic.id
+    trigger_region = var.region
+    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic   = google_pubsub_topic.export_topic.id
   }
 }
 
@@ -112,10 +149,10 @@ resource "google_pubsub_topic" "export_topic" {
 
 # Crear una tarea de Cloud Scheduler para ejecutar la función cada día a las 00:00 horas
 resource "google_cloud_scheduler_job" "export_csv_scheduler" {
-  name             = "export-csv-scheduler"
-  description      = "Trigger exportCSV function every day at 00:00"
-  schedule         = "0 0 * * *"
-  time_zone        = "America/Argentina/Buenos_Aires"
+  name        = "export-csv-scheduler"
+  description = "Trigger exportCSV function every day at 00:00"
+  schedule    = "0 0 * * *"
+  time_zone   = "America/Argentina/Buenos_Aires"
   pubsub_target {
     topic_name = google_pubsub_topic.export_topic.id
     data       = base64encode("Trigger exportCSV function")
