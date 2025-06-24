@@ -100,7 +100,6 @@ resource "google_cloudfunctions2_function" "csv_processor" {
   }
 
   service_config {
-    runtime          = "python310"
     available_memory = "256M"
   }
 
@@ -131,7 +130,6 @@ resource "google_cloudfunctions2_function" "export_csv" {
   }
 
   service_config {
-    runtime          = "python310"
     available_memory = "256M"
   }
 
