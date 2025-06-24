@@ -14,16 +14,21 @@ EXPORT_BUCKET_NAME=${EXPORT_BUCKET_NAME:-testados-rutas-exportadas}
 TF_VAR_credentials_file="${GOOGLE_APPLICATION_CREDENTIALS}"
 export TF_VAR_credentials_file
 
-# Import storage buckets if they exist
-if gsutil ls -b gs://$DATA_BUCKET_NAME >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_storage_bucket.data_bucket $DATA_BUCKET_NAME || true
+# Ensure storage buckets exist before importing them
+if ! gsutil ls -b gs://$DATA_BUCKET_NAME >/dev/null 2>&1; then
+  gsutil mb -p "$PROJECT_ID" -l "$REGION" gs://$DATA_BUCKET_NAME
 fi
-if gsutil ls -b gs://$FUNCTION_BUCKET_NAME >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_storage_bucket.function_bucket $FUNCTION_BUCKET_NAME || true
+terraform import -allow-missing-config google_storage_bucket.data_bucket $DATA_BUCKET_NAME || true
+
+if ! gsutil ls -b gs://$FUNCTION_BUCKET_NAME >/dev/null 2>&1; then
+  gsutil mb -p "$PROJECT_ID" -l "$REGION" gs://$FUNCTION_BUCKET_NAME
 fi
-if gsutil ls -b gs://$EXPORT_BUCKET_NAME >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_storage_bucket.export_bucket $EXPORT_BUCKET_NAME || true
+terraform import -allow-missing-config google_storage_bucket.function_bucket $FUNCTION_BUCKET_NAME || true
+
+if ! gsutil ls -b gs://$EXPORT_BUCKET_NAME >/dev/null 2>&1; then
+  gsutil mb -p "$PROJECT_ID" -l "$REGION" gs://$EXPORT_BUCKET_NAME
 fi
+terraform import -allow-missing-config google_storage_bucket.export_bucket $EXPORT_BUCKET_NAME || true
 
 # Import Cloud Functions if they exist
 if gcloud functions describe csvProcessor --region "$REGION" --gen2 >/dev/null 2>&1; then

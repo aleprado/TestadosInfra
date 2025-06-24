@@ -51,6 +51,15 @@ jobs:
           EXPORT_BUCKET_NAME: ${{ secrets.EXPORT_BUCKET_NAME }}
           REGION: ${{ secrets.GCP_REGION }}
 
+      - name: Ensure and import resources
+        run: bash scripts/import_existing_resources.sh
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
+          DATA_BUCKET_NAME: ${{ secrets.DATA_BUCKET_NAME }}
+          FUNCTION_BUCKET_NAME: ${{ secrets.FUNCTION_BUCKET_NAME }}
+          EXPORT_BUCKET_NAME: ${{ secrets.EXPORT_BUCKET_NAME }}
+          REGION: ${{ secrets.GCP_REGION }}
+
       - name: Apply Terraform
         run: terraform apply -auto-approve -var="credentials_file=${HOME}/gcp-key.json"
         env:
