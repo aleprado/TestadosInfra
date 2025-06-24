@@ -38,12 +38,12 @@ jobs:
 
 
       - name: Initialize Terraform
-        run: terraform init
+        run: terraform init -var="credentials_file=${HOME}/gcp-key.json"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
 
-      - name: Import existing resources
-        run: bash scripts/import_existing_resources.sh
+      - name: Delete existing resources
+        run: bash scripts/delete_existing_resources.sh
         env:
           GOOGLE_APPLICATION_CREDENTIALS: "${HOME}/gcp-key.json"
           DATA_BUCKET_NAME: ${{ secrets.DATA_BUCKET_NAME }}
