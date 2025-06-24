@@ -26,11 +26,11 @@ if gsutil ls -b gs://$EXPORT_BUCKET_NAME >/dev/null 2>&1; then
 fi
 
 # Import Cloud Functions if they exist
-if gcloud functions describe csvProcessor --region "$REGION" >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_cloudfunctions_function.csv_processor $REGION/csvProcessor || true
+if gcloud functions describe csvProcessor --region "$REGION" --gen2 >/dev/null 2>&1; then
+  terraform import -allow-missing-config google_cloudfunctions2_function.csv_processor $REGION/csvProcessor || true
 fi
-if gcloud functions describe exportCSV --region "$REGION" >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_cloudfunctions_function.export_csv $REGION/exportCSV || true
+if gcloud functions describe exportCSV --region "$REGION" --gen2 >/dev/null 2>&1; then
+  terraform import -allow-missing-config google_cloudfunctions2_function.export_csv $REGION/exportCSV || true
 fi
 
 # Import Pub/Sub topic if it exists

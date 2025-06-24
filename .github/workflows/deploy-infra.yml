@@ -36,24 +36,6 @@ jobs:
           python -m json.tool < "${HOME}/gcp-key.json"
         shell: bash
 
-      - name: Install Python dependencies and create ZIPs
-        run: |
-          # Crear el ZIP para la función CSV Processor
-          cd function/csv_processor
-          pip install -r requirements.txt --target ./package
-          cd package
-          zip -r9 ../function_trigger.zip .
-          cd ..
-          zip -g function_trigger.zip main.py
-
-          # Crear el ZIP para la función Export Subcollections
-          cd ../export
-          pip install -r requirements.txt --target ./package
-          cd package
-          zip -r9 ../export_trigger.zip .
-          cd ..
-          zip -g export_trigger.zip main.py
-        shell: bash
 
       - name: Initialize Terraform
         run: terraform init

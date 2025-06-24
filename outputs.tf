@@ -15,10 +15,10 @@ output "export_bucket_name" {
 
 output "csv_processor_function_name" {
   description = "El nombre de la función de Cloud Functions creada para procesar CSV"
-  value       = google_cloudfunctions_function.csv_processor.name
+  value       = google_cloudfunctions2_function.csv_processor.name
 }
 
 output "export_function_name" {
   description = "El nombre de la función de Cloud Functions creada para exportar subcolecciones"
-  value       = google_cloudfunctions_function.export_csv.name
+  value       = google_cloudfunctions2_function.export_csv.name
 }
