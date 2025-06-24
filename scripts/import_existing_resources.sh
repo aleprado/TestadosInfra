@@ -10,6 +10,10 @@ DATA_BUCKET_NAME=${DATA_BUCKET_NAME:-testados-rutas}
 FUNCTION_BUCKET_NAME=${FUNCTION_BUCKET_NAME:-testados-functions}
 EXPORT_BUCKET_NAME=${EXPORT_BUCKET_NAME:-testados-rutas-exportadas}
 
+# Ensure Terraform commands receive the credentials file path
+TF_VAR_credentials_file="${GOOGLE_APPLICATION_CREDENTIALS}"
+export TF_VAR_credentials_file
+
 # Import storage buckets if they exist
 if gsutil ls -b gs://$DATA_BUCKET_NAME >/dev/null 2>&1; then
   terraform import -allow-missing-config google_storage_bucket.data_bucket $DATA_BUCKET_NAME || true
