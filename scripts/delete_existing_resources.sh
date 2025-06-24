@@ -32,13 +32,5 @@ if gcloud functions describe exportCSV --region "$REGION" --gen2 >/dev/null 2>&1
   gcloud functions delete exportCSV --region "$REGION" --gen2 --quiet || true
 fi
 
-# Delete storage buckets if they exist
-if gsutil ls -b "gs://$DATA_BUCKET_NAME" >/dev/null 2>&1; then
-  gsutil -m rm -r "gs://$DATA_BUCKET_NAME" || true
-fi
-if gsutil ls -b "gs://$FUNCTION_BUCKET_NAME" >/dev/null 2>&1; then
-  gsutil -m rm -r "gs://$FUNCTION_BUCKET_NAME" || true
-fi
-if gsutil ls -b "gs://$EXPORT_BUCKET_NAME" >/dev/null 2>&1; then
-  gsutil -m rm -r "gs://$EXPORT_BUCKET_NAME" || true
-fi
+# Buckets are preserved between runs. They will be created if missing in
+# import_existing_resources.sh and should not be deleted here.
