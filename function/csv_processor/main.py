@@ -2,71 +2,69 @@ import csv
 import os
 from google.cloud import firestore, storage
 
-def detect_delimiter(sample: str) -> str:
-    if ';' in sample:
+CAMPOS = [
+    'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
+    'medidor', 'digitos', 'frecuencia', 'categoria', 'estado_anterior',
+    'controlado', 'novedad', 'estado_actual', 'consumo_aa', '%_control_aa',
+    'consumo_promedido_aa', '%_control_promedio_aa', 'observacionlecturista',
+    'fechaToma', 'cortado', 'Latitud', 'Longitud', 'altura'
+]
+
+def normalizar(nombre: str) -> str:
+    nombre = nombre.strip().lower()
+    nombre = nombre.replace('%', 'porcentaje')
+    nombre = nombre.replace(' ', '')
+    nombre = nombre.replace('_', '')
+    return nombre
+
+NORM = [normalizar(c) for c in CAMPOS]
+
+def detectar_delimitador(linea: str) -> str:
+    if ';' in linea:
         return ';'
-    elif ',' in sample:
+    if ',' in linea:
         return ','
+    raise ValueError('Unknown delimiter')
+
+def procesar_csv(datos, contexto):
+    nombre_bucket = datos['bucket']
+    nombre_archivo = datos['name']
+
+    cliente_firestore = firestore.Client()
+    cliente_storage = storage.Client()
+
+    bucket = cliente_storage.bucket(nombre_bucket)
+    blob = bucket.blob(nombre_archivo)
+
+    lineas = blob.download_as_text().splitlines()
+    delimitador = detectar_delimitador(lineas[0])
+    primera = next(csv.reader([lineas[0]], delimiter=delimitador))
+    tiene_encabezado = all(normalizar(c) in NORM for c in primera)
+
+    if tiene_encabezado:
+        lector = csv.DictReader(lineas, delimiter=delimitador)
     else:
-        raise ValueError('Unknown delimiter')
+        lector = csv.DictReader(lineas, delimiter=delimitador, fieldnames=CAMPOS)
 
-def process_csv(data, context):
-    bucket_name = data['bucket']
-    file_name = data['name']
+    nombre_documento = os.path.splitext(os.path.basename(nombre_archivo))[0]
 
-    # Initialize Firestore and Storage clients
-    firestore_client = firestore.Client()
-    storage_client = storage.Client()
-
-    # Define the path for the file in Cloud Storage
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(file_name)
-
-    # Read the file content
-    content = blob.download_as_text().splitlines()
-
-    # Detect the delimiter from the first line of the CSV
-    delimiter = detect_delimiter(content[0])
-
-    # Parse the CSV content with the detected delimiter
-    csv_reader = csv.DictReader(content, delimiter=delimiter)
-
-    # Extract base file name without extension for the document name
-    document_name = os.path.splitext(os.path.basename(file_name))[0]
-
-    # Extract client and locality names from the folder structure in the bucket path
-    folder_parts = file_name.split('/')
-    if len(folder_parts) >= 3:
-        # The expected structure is <cliente>/<localidad>/<archivo>
-        client_name = folder_parts[0]
-        locality_name = folder_parts[1]
+    partes = nombre_archivo.split('/')
+    if len(partes) >= 3:
+        cliente_nombre = partes[0]
+        localidad_nombre = partes[1]
     else:
-        raise ValueError(
-            'Invalid file path structure. Expected at least cliente/localidad/archivo'
-        )
+        raise ValueError('estructura de ruta invalida')
 
-    # Firestore references
-    client_ref = firestore_client.collection('Clientes').document(client_name)
-    locality_ref = client_ref.collection('Localidades').document(locality_name)
-    ruta_ref = firestore_client.collection('Rutas').document(document_name)
+    ref_cliente = cliente_firestore.collection('Clientes').document(cliente_nombre)
+    ref_localidad = ref_cliente.collection('Localidades').document(localidad_nombre)
+    ref_ruta = cliente_firestore.collection('Rutas').document(nombre_documento)
 
-    # Save metadata in the route document
-    ruta_ref.set({
-        'cliente': client_ref,
-        'localidad': locality_ref
-    }, merge=True)
+    ref_ruta.set({'cliente': ref_cliente, 'localidad': ref_localidad}, merge=True)
+    ref_localidad.set({'rutas': firestore.ArrayUnion([ref_ruta])}, merge=True)
 
-    # Add a reference to the route in the client's locality sub-collection
-    locality_ref.set({
-        'rutas': firestore.ArrayUnion([ruta_ref])
-    }, merge=True)
+    subcoleccion = ref_ruta.collection('RutaRecorrido')
+    for indice, fila in enumerate(lector):
+        subcoleccion.document(str(indice)).set(fila)
 
-    # Process each row in the CSV and save it in the sub-collection "RutaRecorrido"
-    sub_collection_ref = ruta_ref.collection('RutaRecorrido')
-    for idx, row in enumerate(csv_reader):
-        if 'estado_actual' not in row:
-            row['estado_actual'] = ''  # Default value if not provided
-        sub_collection_ref.document(str(idx)).set(row)
-
-    print(f"Processed {len(content)} lines from {file_name}.")
-    return len(content)
+    print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
+    return len(lineas)
