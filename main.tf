@@ -96,7 +96,7 @@ resource "google_cloudfunctions2_function" "csv_processor" {
 
   build_config {
     runtime     = "python310"
-    entry_point = "process_csv"
+    entry_point = "procesar_csv"
     source {
       storage_source {
         bucket = google_storage_bucket_object.upload_csv_trigger.bucket
