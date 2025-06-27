@@ -53,6 +53,7 @@ def procesar_csv(datos, contexto):
 
     subcoleccion = ref_ruta.collection('RutaRecorrido')
     for indice, fila in enumerate(lector):
+        fila = {k: ('' if v == '0' else v) for k, v in fila.items()}
         subcoleccion.document(str(indice)).set(fila)
 
     print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
