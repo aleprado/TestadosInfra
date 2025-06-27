@@ -3,7 +3,7 @@ import os
 from google.cloud import firestore, storage
 
 CAMPOS = [
-    'zona', 'orden', 'servicio', 'estado', 'cliente', 'direccion', 'localidad',
+    'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
     'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior',
     'controles', 'novedades', 'lectura_actual', 'consumo_aa',
     'porcentaje_control_aa', 'consumo_promedido_aa',
