@@ -3,21 +3,13 @@ import os
 from google.cloud import firestore, storage
 
 CAMPOS = [
-    'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
-    'medidor', 'digitos', 'frecuencia', 'categoria', 'estado_anterior',
-    'controlado', 'novedad', 'estado_actual', 'consumo_aa', '%_control_aa',
-    'consumo_promedido_aa', '%_control_promedio_aa', 'observacionlecturista',
-    'fechaToma', 'cortado', 'Latitud', 'Longitud', 'altura'
+    'zona', 'orden', 'servicio', 'estado', 'cliente', 'direccion', 'localidad',
+    'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior',
+    'controles', 'novedades', 'lectura_actual', 'consumo_aa',
+    'porcentaje_control_aa', 'consumo_promedido_aa',
+    'porcentaje_control_promedio_aa', 'observacionlecturista',
+    'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura'
 ]
-
-def normalizar(nombre: str) -> str:
-    nombre = nombre.strip().lower()
-    nombre = nombre.replace('%', 'porcentaje')
-    nombre = nombre.replace(' ', '')
-    nombre = nombre.replace('_', '')
-    return nombre
-
-NORM = [normalizar(c) for c in CAMPOS]
 
 def detectar_delimitador(linea: str) -> str:
     if ';' in linea:
@@ -39,12 +31,9 @@ def procesar_csv(datos, contexto):
     lineas = blob.download_as_text().splitlines()
     delimitador = detectar_delimitador(lineas[0])
     primera = next(csv.reader([lineas[0]], delimiter=delimitador))
-    tiene_encabezado = all(normalizar(c) in NORM for c in primera)
-
-    if tiene_encabezado:
-        lector = csv.DictReader(lineas, delimiter=delimitador)
-    else:
-        lector = csv.DictReader(lineas, delimiter=delimitador, fieldnames=CAMPOS)
+    if primera == CAMPOS:
+        lineas = lineas[1:]
+    lector = csv.DictReader(lineas, delimiter=delimitador, fieldnames=CAMPOS)
 
     nombre_documento = os.path.splitext(os.path.basename(nombre_archivo))[0]
 
