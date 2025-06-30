@@ -8,8 +8,9 @@ def export_subcollections(event, context):
     storage_client = storage.Client()
 
     # Obtener el nombre del bucket donde se almacenarán los archivos exportados
-    export_bucket_name = os.environ['EXPORT_BUCKET_NAME']
-    export_bucket = storage_client.bucket(export_bucket_name)
+    nombre_bucket_exportacion = os.environ.get('EXPORT_BUCKET_NAME', 'testados-rutas-exportadas')
+    os.environ['EXPORT_BUCKET_NAME'] = nombre_bucket_exportacion
+    export_bucket = storage_client.bucket(nombre_bucket_exportacion)
 
     # Obtener todas las colecciones de "Rutas"
     rutas_collection = firestore_client.collection('Rutas')
