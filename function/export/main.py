@@ -50,7 +50,7 @@ def export_subcollections(event, context):
 
                 # Calcular el porcentaje de documentos completados
                 total_docs = len(sorted_docs)
-                completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('estado_actual'))
+                completed_docs = sum(1 for doc in sorted_docs if doc.to_dict().get('lectura_actual'))
                 completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
 
                 # Actualizar el campo 'completado' en la ruta
@@ -64,6 +64,6 @@ def export_subcollections(event, context):
                     # Escribir los valores del documento en el CSV
                     writer.writerow(doc.to_dict().values())
 
-            print(f'Ruta {ruta_id} exportada a {file_name} con porcentaje completado: {completion_percentage:.2f}%')
+            print(f'Ruta {ruta_id} exportada a {file_name} con porcentaje tomado: {completion_percentage:.2f}%')
 
-    print('Exportación completada.')
+    print('Exportación completa.')
