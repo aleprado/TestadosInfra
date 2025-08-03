@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 from google.cloud import firestore, storage
 
 CAMPOS = [
@@ -17,6 +18,14 @@ def detectar_delimitador(linea: str) -> str:
     if ',' in linea:
         return ','
     raise ValueError('Unknown delimiter')
+
+def limpiar_valor(valor: str) -> str:
+    valor = re.sub(r' {2,}', ' ', valor).strip()
+    if valor.isdigit():
+        valor = valor.lstrip('0')
+        if valor == '':
+            return ''
+    return '' if valor == '0' else valor
 
 def procesar_csv(datos, contexto):
     nombre_bucket = datos['bucket']
@@ -53,7 +62,7 @@ def procesar_csv(datos, contexto):
 
     subcoleccion = ref_ruta.collection('RutaRecorrido')
     for indice, fila in enumerate(lector):
-        fila = {k: ('' if v == '0' else v) for k, v in fila.items()}
+        fila = {k: limpiar_valor(v) for k, v in fila.items()}
         subcoleccion.document(str(indice)).set(fila)
 
     print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
