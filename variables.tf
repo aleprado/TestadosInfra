@@ -33,3 +33,9 @@ variable "credentials_file" {
   type        = string
   default     = ""
 }
+
+variable "cuenta_servicio_web" {
+  description = "Cuenta de servicio de la app web"
+  type        = string
+  default     = ""
+}

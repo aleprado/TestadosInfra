@@ -37,6 +37,13 @@ resource "google_storage_bucket" "data_bucket" {
   }
 }
 
+resource "google_storage_bucket_iam_member" "lector_rutas" {
+  bucket     = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role       = "roles/storage.objectViewer"
+  member     = "serviceAccount:${var.cuenta_servicio_web}"
+  depends_on = [google_storage_bucket.data_bucket]
+}
+
 # Crear el bucket de funciones solo si no existe
 resource "google_storage_bucket" "function_bucket" {
   count    = data.google_storage_bucket.existing_function_bucket.id == null ? 1 : 0
