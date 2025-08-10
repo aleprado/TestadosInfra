@@ -89,6 +89,20 @@ resource "google_storage_bucket_object" "upload_export_trigger" {
   depends_on = [google_storage_bucket.function_bucket]
 }
 
+# Subir el archivo ZIP de la función HTTP de exportación on-demand
+data "archive_file" "export_on_demand_src" {
+  type        = "zip"
+  source_dir  = "${path.module}/function/export_on_demand"
+  output_path = "${path.module}/function/export_on_demand/export_on_demand.zip"
+}
+
+resource "google_storage_bucket_object" "upload_export_on_demand" {
+  name       = "export_on_demand.zip"
+  bucket     = data.google_storage_bucket.existing_function_bucket.name
+  source     = data.archive_file.export_on_demand_src.output_path
+  depends_on = [google_storage_bucket.function_bucket]
+}
+
 # Crear la función de Cloud Functions para procesar CSVs
 resource "google_cloudfunctions2_function" "csv_processor" {
   name     = "csvProcessor"
@@ -146,6 +160,52 @@ resource "google_cloudfunctions2_function" "export_csv" {
   }
 }
 
+# Función HTTP: exportación on-demand
+resource "google_cloudfunctions2_function" "export_csv_on_demand" {
+  name     = "exportCSVOnDemand"
+  location = var.region
+
+  build_config {
+    runtime     = "python310"
+    entry_point = "export_on_demand_http"
+    source {
+      storage_source {
+        bucket = google_storage_bucket_object.upload_export_on_demand.bucket
+        object = google_storage_bucket_object.upload_export_on_demand.name
+      }
+    }
+  }
+
+  service_config {
+    available_memory = "256M"
+    environment_variables = {
+      EXPORT_BUCKET_NAME = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+    }
+  }
+}
+
+# Permitir invocación pública de la función HTTP
+resource "google_cloud_run_v2_service_iam_member" "invoker_all_users_export_on_demand" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.export_csv_on_demand.service_config[0].service
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Conceder permisos a la service account por defecto de Cloud Run/Functions v2
+resource "google_storage_bucket_iam_member" "export_bucket_object_admin_compute_sa" {
+  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "functions_firestore_user_compute_sa" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # Crear un Pub/Sub topic para disparar la función exportCSV
 resource "google_pubsub_topic" "export_topic" {
   name = "export-csv-topic"
@@ -161,4 +221,32 @@ resource "google_cloud_scheduler_job" "export_csv_scheduler" {
     topic_name = google_pubsub_topic.export_topic.id
     data       = base64encode("Trigger exportCSV function")
   }
+}
+
+# Hacer público el bucket de exportación para descargas anónimas
+resource "google_storage_bucket_iam_member" "export_bucket_public_read" {
+  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
+# Permisos para escribir en el bucket de exportación (función exportCSV)
+resource "google_storage_bucket_iam_member" "export_bucket_object_admin" {
+  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
+}
+
+# Permisos de lectura para el bucket de datos (función csvProcessor)
+resource "google_storage_bucket_iam_member" "data_bucket_object_viewer" {
+  bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
+}
+
+# Firestore acceso para funciones
+resource "google_project_iam_member" "functions_firestore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
 }
