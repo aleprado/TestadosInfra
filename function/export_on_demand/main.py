@@ -1,6 +1,5 @@
 import os
 import csv
-import json
 from datetime import datetime
 from google.cloud import firestore
 from google.cloud import storage
@@ -10,184 +9,176 @@ import functions_framework
 app = Flask(__name__)
 
 def _get_param(request, param_name):
-    """Obtener parámetro de query string o JSON body"""
-    # Intentar obtener de query string primero
-    value = request.args.get(param_name)
-    if value:
-        return value
-    
-    # Si no está en query string, intentar del JSON body
-    try:
-        body = request.get_json()
-        if body and param_name in body:
-            return body[param_name]
-    except:
-        pass
-    
-    return None
+    """Obtiene un parámetro del request, ya sea de query params o del body JSON"""
+    if request.method == 'GET':
+        return request.args.get(param_name)
+    else:
+        try:
+            body = request.get_json()
+            return body.get(param_name) if body else None
+        except:
+            return None
 
 @functions_framework.http
-def export_on_demand_http(request):
-    """Función HTTP para exportar datos de una ruta específica a CSV"""
+def export_csv_on_demand(request):
+    """Función simplificada basada en la función original de exportación"""
     
+    # Log de versión para verificar que estamos usando la última
+    print(f"DEBUG: [VERSION 2025-08-11 12:45] Función export_csv_on_demand iniciada")
+    print(f"DEBUG: [VERSION 2025-08-11 12:45] Timestamp de inicio: {datetime.now().isoformat()}")
+
     # Configurar CORS
     if request.method == 'OPTIONS':
         headers = {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Methods': 'GET, POST',
             'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
         }
         return ('', 204, headers)
-    
-    headers = {
+
+    cors_headers = {
         'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
+        'Access-Control-Allow-Methods': 'GET, POST',
+        'Access-Control-Allow-Headers': 'Content-Type'
     }
-    
+
     try:
         # Obtener parámetros
-        cliente = _get_param(request, "cliente")
-        localidad = _get_param(request, "localidad")
-        ruta_id = _get_param(request, "rutaId")
-        
-        # Log de debug
-        print(f"DEBUG: Parámetros recibidos - cliente: {cliente}, localidad: {localidad}, ruta_id: {ruta_id}")
-        
-        if not all([cliente, localidad, ruta_id]):
+        cliente = _get_param(request, 'cliente')
+        localidad = _get_param(request, 'localidad')
+        ruta_id = _get_param(request, 'rutaId')
+
+        if not cliente or not localidad or not ruta_id:
             return jsonify({
                 'error': 'Faltan parámetros requeridos: cliente, localidad, rutaId'
-            }), 400, headers
-        
-        # Inicializar Firestore
-        db = firestore.Client()
-        
-        # Referencia a la ruta
-        ruta_ref = db.collection("Clientes").document(cliente).collection("Localidades").document(localidad).collection("Rutas").document(ruta_id)
+            }), 400, cors_headers
+
+        print(f"DEBUG: Exportando ruta {ruta_id} para cliente {cliente} en localidad {localidad}")
+
+        # Inicializar clientes
+        firestore_client = firestore.Client()
+        storage_client = storage.Client()
+
+        # Obtener bucket de exportación
+        nombre_bucket_exportacion = os.environ.get('EXPORT_BUCKET_NAME', 'testados-rutas-exportadas')
+        export_bucket = storage_client.bucket(nombre_bucket_exportacion)
+
+        # Buscar la ruta específica
+        ruta_ref = firestore_client.collection('Rutas').document(ruta_id)
         ruta_doc = ruta_ref.get()
-        
+
         if not ruta_doc.exists:
             return jsonify({
                 'error': f'Ruta {ruta_id} no encontrada'
-            }), 404, headers
-        
-        # Obtener datos de la ruta
+            }), 404, cors_headers
+
         ruta_data = ruta_doc.to_dict()
+        print(f"DEBUG: Ruta encontrada, datos: {list(ruta_data.keys())}")
+
+        # Obtener las subcolecciones de la ruta
+        subcollections = ruta_ref.collections()
+        subcollections_list = list(subcollections)  # Convertir a lista una sola vez
+        print(f"DEBUG: Subcolecciones encontradas: {[sc.id for sc in subcollections_list]}")
         
-        # Obtener usuarios asignados
-        usuarios_ref = ruta_ref.collection("UsuariosAsignados")
-        usuarios_snapshot = usuarios_ref.get()
-        usuarios_asignados = [doc.id for doc in usuarios_snapshot]
-        
-        # Calcular porcentaje de completado
-        ref_lecturas = ruta_ref.collection("RutaRecorrido")
-        lecturas_snapshot = ref_lecturas.get()
-        total_lecturas = len(lecturas_snapshot)
-        
-        if total_lecturas > 0:
-            lecturas_con_medicion = sum(1 for doc in lecturas_snapshot if doc.to_dict().get("lectura_actual"))
-            porcentaje_completado = (lecturas_con_medicion / total_lecturas) * 100
-        else:
-            porcentaje_completado = 0
-        
-        # Preparar datos para CSV
-        csv_data = []
-        
-        # Agregar información de la ruta
-        ruta_row = {
-            "Ruta ID": ruta_id,
-            "Cliente": cliente,
-            "Localidad": localidad,
-            "Estado": ruta_data.get("estado", "N/A"),
-            "Porcentaje Completado": f"{porcentaje_completado:.1f}%",
-            "Total Lecturas": total_lecturas,
-            "Lecturas con Medición": lecturas_con_medicion if total_lecturas > 0 else 0,
-            "Usuarios Asignados": ", ".join(usuarios_asignados) if usuarios_asignados else "Ninguno"
-        }
-        csv_data.append(ruta_row)
-        
-        # Agregar datos de lecturas
-        for doc in lecturas_snapshot:
-            lectura_data = doc.to_dict()
-            # Filtrar solo campos relevantes, excluyendo metadatos de Firestore
-            filtered_row = {}
-            for key, value in lectura_data.items():
-                if not key.startswith('_') and not callable(value):
-                    filtered_row[key] = value
-            
-            if filtered_row:
-                csv_data.append(filtered_row)
-        
-        if not csv_data:
-            return jsonify({
-                'error': 'No hay datos para exportar'
-            }), 404, headers
-        
-        # Escribir CSV
-        csv_filename = f"/tmp/{ruta_id}_export.csv"
-        
-        # Determinar headers basándose en la primera fila para mantener orden consistente
-        if csv_data:
-            headers = list(csv_data[0].keys())
-            
-            with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=headers)
-                writer.writeheader()
+        print(f"DEBUG: Iniciando procesamiento de {len(subcollections_list)} subcolecciones")
+
+        # Crear archivo CSV
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f'{cliente}/{localidad}/{ruta_id}_{timestamp}.csv'
+        blob = export_bucket.blob(file_name)
+
+        total_docs = 0
+        completed_docs = 0
+        all_headers = set()  # Para almacenar todos los campos únicos
+
+        with blob.open("wt", newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            header_written = False
+
+            for subcollection in subcollections_list:
+                print(f"DEBUG: Procesando subcolección: {subcollection.id}")
+                documents = subcollection.stream()
+                doc_list = list(documents)
+                print(f"DEBUG: Documentos en {subcollection.id}: {len(doc_list)}")
                 
-                for row in csv_data:
-                    # Asegurar que cada fila tenga todos los headers en el mismo orden
-                    ordered_row = {header: row.get(header, '') for header in headers}
-                    writer.writerow(ordered_row)
-        
-        # Subir a GCS
-        storage_client = storage.Client()
-        export_bucket_name = os.environ.get("EXPORT_BUCKET_NAME", "testados-rutas-exportadas")
-        
-        # Usar timestamp legible para generar nombre único
-        timestamp = _get_param(request, "t")
-        if timestamp:
-            # Convertir timestamp de milisegundos a formato legible
-            try:
-                timestamp_ms = int(timestamp)
-                timestamp_date = datetime.fromtimestamp(timestamp_ms / 1000)
-                timestamp_readable = timestamp_date.strftime("%Y-%m-%d_%H-%M-%S")
-            except:
-                # Si falla la conversión, usar timestamp actual
-                timestamp_readable = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        else:
-            # Si no hay timestamp, usar el actual
-            timestamp_readable = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        
-        object_name = f"{cliente}/{localidad}/{ruta_id}_{timestamp_readable}.csv"
-        
-        bucket = storage_client.bucket(export_bucket_name)
-        blob = bucket.blob(object_name)
-        
-        blob.upload_from_filename(csv_filename)
-        
-        # Hacer público el archivo
-        blob.make_public()
-        
-        # Actualizar Firestore con información de completado
-        ruta_ref.update({
-            "ultima_exportacion": firestore.SERVER_TIMESTAMP,
-            "porcentaje_completado": porcentaje_completado,
-            "archivo_csv_url": blob.public_url
-        })
-        
-        # Limpiar archivo temporal
-        os.remove(csv_filename)
-        
+                if len(doc_list) == 0:
+                    print(f"DEBUG: Subcolección {subcollection.id} está vacía")
+                    continue
+
+                print(f"DEBUG: Encontrados {len(doc_list)} documentos en {subcollection.id}")
+                print(f"DEBUG: IDs de documentos: {[doc.id for doc in doc_list[:5]]}")  # Mostrar primeros 5 IDs
+
+                # Ordenar documentos por ID numérico
+                sorted_docs = sorted(doc_list, key=lambda d: int(d.id))
+                print(f"DEBUG: Procesando {len(sorted_docs)} documentos en {subcollection.id}")
+
+                # Contar documentos completados
+                total_docs += len(sorted_docs)
+                completed_docs += sum(1 for doc in sorted_docs if doc.to_dict().get('lectura_actual'))
+
+                for doc in sorted_docs:
+                    doc_data = doc.to_dict()
+                    print(f"DEBUG: Escribiendo documento {doc.id} con {len(doc_data)} campos")
+                    
+                    # Mapear campos para normalizar nombres
+                    normalized_data = {}
+                    for key, value in doc_data.items():
+                        if key == 'controles':
+                            normalized_data['controlado'] = value
+                        elif key == 'fecha_hora_lectura':
+                            normalized_data['fechaToma'] = value
+                        elif key == 'novedades':
+                            normalized_data['novedad'] = value
+                        else:
+                            normalized_data[key] = value
+                    
+                    # Asegurar que todos los documentos tengan el campo imagenUrl
+                    if 'imagenUrl' not in normalized_data:
+                        normalized_data['imagenUrl'] = ''
+
+                    if not header_written:
+                        # Escribir el encabezado en el CSV
+                        headers = sorted(list(normalized_data.keys()))
+                        writer.writerow(headers)
+                        header_written = True
+                        print(f"DEBUG: Headers escritos: {headers}")
+                        all_headers.update(headers)
+                    
+                    # Crear fila con todos los campos, llenando con vacío los faltantes
+                    row = []
+                    for header in all_headers:
+                        row.append(normalized_data.get(header, ''))
+                    
+                    writer.writerow(row)
+                    print(f"DEBUG: Documento {doc.id} escrito con {len(row)} campos")
+
+        # Calcular porcentaje de completado
+        completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
+
+        # Actualizar el campo 'completado' en la ruta
+        ruta_ref.update({'completado': completion_percentage})
+
+        print(f"DEBUG: Total de filas en CSV: {total_docs}")
+        print(f"DEBUG: Total de lecturas: {completed_docs}")
+
         return jsonify({
             'success': True,
-            'url': blob.public_url,
-            'filename': object_name,
-            'timestamp': timestamp_readable,
-            'porcentaje_completado': porcentaje_completado
-        }), 200, headers
-        
+            'filename': file_name,
+            'total_documentos': total_docs,
+            'documentos_completados': completed_docs,
+            'porcentaje_completado': completion_percentage,
+            'timestamp': timestamp,
+            'url': f"https://storage.googleapis.com/{nombre_bucket_exportacion}/{file_name}"
+        }), 200, cors_headers
+
     except Exception as e:
+        print(f"ERROR: {str(e)}")
         return jsonify({
             'error': f'Error interno: {str(e)}'
-        }), 500, headers
+        }), 500, cors_headers
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=True)
 
 

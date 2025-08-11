@@ -171,7 +171,7 @@ resource "google_cloudfunctions2_function" "export_csv_on_demand" {
 
   build_config {
     runtime     = "python310"
-    entry_point = "export_on_demand_http"
+    entry_point = "export_csv_on_demand"
     source {
       storage_source {
         bucket = google_storage_bucket_object.upload_export_on_demand.bucket
