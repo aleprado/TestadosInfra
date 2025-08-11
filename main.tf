@@ -1,7 +1,7 @@
 provider "google" {
   project     = var.project_id
   region      = var.region
-  credentials = file(var.credentials_file)
+  # credentials = file(var.credentials_file)  # Comentado para usar credenciales por defecto
 }
 
 # Retrieve current project information for IAM bindings
@@ -242,6 +242,13 @@ resource "google_storage_bucket_iam_member" "data_bucket_object_viewer" {
   bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
+}
+
+# Permisos de lectura para el bucket de datos (función csvProcessor - service account de compute)
+resource "google_storage_bucket_iam_member" "data_bucket_object_viewer_compute_sa" {
+  bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
 # Firestore acceso para funciones

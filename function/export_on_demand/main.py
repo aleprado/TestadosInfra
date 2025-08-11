@@ -57,6 +57,12 @@ def export_on_demand_http(request: Request):
     docs = list(subcollection.stream())
     # Ordenar por ID numérico
     docs = sorted(docs, key=lambda d: int(d.id)) if docs else []
+    
+    # Debug: mostrar campos del primer documento
+    if docs:
+        first_doc = docs[0].to_dict()
+        print(f"Campos del primer documento: {list(first_doc.keys())}")
+        print(f"Valores del primer documento: {list(first_doc.values())}")
 
     # Calcular porcentaje completado
     total_docs = len(docs)
@@ -67,7 +73,14 @@ def export_on_demand_http(request: Request):
     ruta_ref.update({"completado": completion_percentage})
 
     export_bucket_name = os.environ.get("EXPORT_BUCKET_NAME", "testados-rutas-exportadas")
-    object_name = f"{cliente}/{localidad}/{ruta_id}.csv"
+    
+    # Usar timestamp del frontend para generar nombre único
+    timestamp = _get_param(request, "t")
+    if timestamp:
+        object_name = f"{cliente}/{localidad}/{ruta_id}_{timestamp}.csv"
+    else:
+        object_name = f"{cliente}/{localidad}/{ruta_id}.csv"
+    
     bucket = storage_client.bucket(export_bucket_name)
     blob = bucket.blob(object_name)
 
@@ -75,12 +88,37 @@ def export_on_demand_http(request: Request):
     header_written = False
     with blob.open("wt", newline="") as csv_file:
         writer = csv.writer(csv_file)
+        
+        # Primero, determinar qué campos incluir basándose en el primer documento
+        campos_a_incluir = []
+        if docs:
+            first_doc = docs[0].to_dict()
+            campos_excluidos = {
+                '__name__', '__class__', '__doc__', '__module__', '__dict__',
+                '__weakref__', '__slots__', '__annotations__', '__defaults__',
+                '__code__', '__globals__', '__closure__', '__kwdefaults__'
+            }
+            
+            # Filtrar campos del primer documento para establecer el orden
+            for key in first_doc.keys():
+                if (not key.startswith('_') and 
+                    key not in campos_excluidos and
+                    not callable(first_doc[key])):
+                    campos_a_incluir.append(key)
+            
+            print(f"Campos que se exportarán en orden: {campos_a_incluir}")
+        
+        # Escribir encabezado
+        if campos_a_incluir:
+            writer.writerow(campos_a_incluir)
+            header_written = True
+        
+        # Escribir datos
         for doc in docs:
             row = doc.to_dict() or {}
-            if not header_written:
-                writer.writerow(list(row.keys()))
-                header_written = True
-            writer.writerow(list(row.values()))
+            # Escribir valores en el mismo orden que el encabezado
+            valores_ordenados = [row.get(campo, '') for campo in campos_a_incluir]
+            writer.writerow(valores_ordenados)
 
     public_url = f"https://storage.googleapis.com/{export_bucket_name}/{object_name}"
 
