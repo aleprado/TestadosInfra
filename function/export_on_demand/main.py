@@ -1,136 +1,193 @@
 import os
 import csv
-from flask import Request, make_response
-from google.cloud import firestore, storage
+import json
+from datetime import datetime
+from google.cloud import firestore
+from google.cloud import storage
+from flask import Flask, request, jsonify
+import functions_framework
 
+app = Flask(__name__)
 
-def _json_response(payload, status=200):
-    from json import dumps
-    resp = make_response(dumps(payload), status)
-    resp.headers["Content-Type"] = "application/json"
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    return resp
-
-
-def _get_param(request: Request, key: str) -> str:
-    # admite querystring o JSON body
-    value = request.args.get(key)
+def _get_param(request, param_name):
+    """Obtener parámetro de query string o JSON body"""
+    # Intentar obtener de query string primero
+    value = request.args.get(param_name)
     if value:
-        return value.strip()
+        return value
+    
+    # Si no está en query string, intentar del JSON body
     try:
-        data = request.get_json(silent=True) or {}
-        value = data.get(key, "")
-        return str(value).strip()
-    except Exception:
-        return ""
-
-
-def export_on_demand_http(request: Request):
-    # Manejo preflight CORS
-    if request.method == "OPTIONS":
-        resp = make_response("", 204)
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "*"
-        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-        return resp
-    cliente = _get_param(request, "cliente")
-    localidad = _get_param(request, "localidad")
-    ruta_id = _get_param(request, "rutaId")
-
-    if not (cliente and localidad and ruta_id):
-        return _json_response({"error": "Parámetros requeridos: cliente, localidad, rutaId"}, 400)
-
-    # Inicializar clientes
-    firestore_client = firestore.Client()
-    storage_client = storage.Client()
-
-    # Verificar que la ruta existe
-    ruta_ref = firestore_client.collection("Rutas").document(ruta_id)
-    ruta_doc = ruta_ref.get()
-    if not ruta_doc.exists:
-        return _json_response({"error": f"Ruta {ruta_id} no encontrada"}, 404)
-
-    # Leer subcolecciones (RutaRecorrido) y exportar a CSV
-    subcollection = ruta_ref.collection("RutaRecorrido")
-    docs = list(subcollection.stream())
-    # Ordenar por ID numérico
-    docs = sorted(docs, key=lambda d: int(d.id)) if docs else []
+        body = request.get_json()
+        if body and param_name in body:
+            return body[param_name]
+    except:
+        pass
     
-    # Debug: mostrar campos del primer documento
-    if docs:
-        first_doc = docs[0].to_dict()
-        print(f"Campos del primer documento: {list(first_doc.keys())}")
-        print(f"Valores del primer documento: {list(first_doc.values())}")
+    return None
 
-    # Calcular porcentaje completado
-    total_docs = len(docs)
-    completed_docs = sum(1 for doc in docs if (doc.to_dict() or {}).get("lectura_actual"))
-    completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
-
-    # Actualizar campo 'completado' en la ruta
-    ruta_ref.update({"completado": completion_percentage})
-
-    export_bucket_name = os.environ.get("EXPORT_BUCKET_NAME", "testados-rutas-exportadas")
+@functions_framework.http
+def export_on_demand_http(request):
+    """Función HTTP para exportar datos de una ruta específica a CSV"""
     
-    # Usar timestamp del frontend para generar nombre único
-    timestamp = _get_param(request, "t")
-    if timestamp:
-        object_name = f"{cliente}/{localidad}/{ruta_id}_{timestamp}.csv"
-    else:
-        object_name = f"{cliente}/{localidad}/{ruta_id}.csv"
+    # Configurar CORS
+    if request.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+        return ('', 204, headers)
     
-    bucket = storage_client.bucket(export_bucket_name)
-    blob = bucket.blob(object_name)
-
-    # Escribir CSV
-    header_written = False
-    with blob.open("wt", newline="") as csv_file:
-        writer = csv.writer(csv_file)
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+    }
+    
+    try:
+        # Obtener parámetros
+        cliente = _get_param(request, "cliente")
+        localidad = _get_param(request, "localidad")
+        ruta_id = _get_param(request, "rutaId")
         
-        # Primero, determinar qué campos incluir basándose en el primer documento
-        campos_a_incluir = []
-        if docs:
-            first_doc = docs[0].to_dict()
-            campos_excluidos = {
-                '__name__', '__class__', '__doc__', '__module__', '__dict__',
-                '__weakref__', '__slots__', '__annotations__', '__defaults__',
-                '__code__', '__globals__', '__closure__', '__kwdefaults__'
-            }
+        # Log de debug
+        print(f"DEBUG: Parámetros recibidos - cliente: {cliente}, localidad: {localidad}, ruta_id: {ruta_id}")
+        
+        if not all([cliente, localidad, ruta_id]):
+            return jsonify({
+                'error': 'Faltan parámetros requeridos: cliente, localidad, rutaId'
+            }), 400, headers
+        
+        # Inicializar Firestore
+        db = firestore.Client()
+        
+        # Referencia a la ruta
+        ruta_ref = db.collection("Clientes").document(cliente).collection("Localidades").document(localidad).collection("Rutas").document(ruta_id)
+        ruta_doc = ruta_ref.get()
+        
+        if not ruta_doc.exists:
+            return jsonify({
+                'error': f'Ruta {ruta_id} no encontrada'
+            }), 404, headers
+        
+        # Obtener datos de la ruta
+        ruta_data = ruta_doc.to_dict()
+        
+        # Obtener usuarios asignados
+        usuarios_ref = ruta_ref.collection("UsuariosAsignados")
+        usuarios_snapshot = usuarios_ref.get()
+        usuarios_asignados = [doc.id for doc in usuarios_snapshot]
+        
+        # Calcular porcentaje de completado
+        ref_lecturas = ruta_ref.collection("RutaRecorrido")
+        lecturas_snapshot = ref_lecturas.get()
+        total_lecturas = len(lecturas_snapshot)
+        
+        if total_lecturas > 0:
+            lecturas_con_medicion = sum(1 for doc in lecturas_snapshot if doc.to_dict().get("lectura_actual"))
+            porcentaje_completado = (lecturas_con_medicion / total_lecturas) * 100
+        else:
+            porcentaje_completado = 0
+        
+        # Preparar datos para CSV
+        csv_data = []
+        
+        # Agregar información de la ruta
+        ruta_row = {
+            "Ruta ID": ruta_id,
+            "Cliente": cliente,
+            "Localidad": localidad,
+            "Estado": ruta_data.get("estado", "N/A"),
+            "Porcentaje Completado": f"{porcentaje_completado:.1f}%",
+            "Total Lecturas": total_lecturas,
+            "Lecturas con Medición": lecturas_con_medicion if total_lecturas > 0 else 0,
+            "Usuarios Asignados": ", ".join(usuarios_asignados) if usuarios_asignados else "Ninguno"
+        }
+        csv_data.append(ruta_row)
+        
+        # Agregar datos de lecturas
+        for doc in lecturas_snapshot:
+            lectura_data = doc.to_dict()
+            # Filtrar solo campos relevantes, excluyendo metadatos de Firestore
+            filtered_row = {}
+            for key, value in lectura_data.items():
+                if not key.startswith('_') and not callable(value):
+                    filtered_row[key] = value
             
-            # Filtrar campos del primer documento para establecer el orden
-            for key in first_doc.keys():
-                if (not key.startswith('_') and 
-                    key not in campos_excluidos and
-                    not callable(first_doc[key])):
-                    campos_a_incluir.append(key)
+            if filtered_row:
+                csv_data.append(filtered_row)
+        
+        if not csv_data:
+            return jsonify({
+                'error': 'No hay datos para exportar'
+            }), 404, headers
+        
+        # Escribir CSV
+        csv_filename = f"/tmp/{ruta_id}_export.csv"
+        
+        # Determinar headers basándose en la primera fila para mantener orden consistente
+        if csv_data:
+            headers = list(csv_data[0].keys())
             
-            print(f"Campos que se exportarán en orden: {campos_a_incluir}")
+            with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=headers)
+                writer.writeheader()
+                
+                for row in csv_data:
+                    # Asegurar que cada fila tenga todos los headers en el mismo orden
+                    ordered_row = {header: row.get(header, '') for header in headers}
+                    writer.writerow(ordered_row)
         
-        # Escribir encabezado
-        if campos_a_incluir:
-            writer.writerow(campos_a_incluir)
-            header_written = True
+        # Subir a GCS
+        storage_client = storage.Client()
+        export_bucket_name = os.environ.get("EXPORT_BUCKET_NAME", "testados-rutas-exportadas")
         
-        # Escribir datos
-        for doc in docs:
-            row = doc.to_dict() or {}
-            # Escribir valores en el mismo orden que el encabezado
-            valores_ordenados = [row.get(campo, '') for campo in campos_a_incluir]
-            writer.writerow(valores_ordenados)
-
-    public_url = f"https://storage.googleapis.com/{export_bucket_name}/{object_name}"
-
-    # Redirección directa para evitar CORS en front si se usa navegación
-    if (_get_param(request, "redirect") or "").lower() in ("1", "true", "yes"): 
-        resp = make_response("", 302)
-        resp.headers["Location"] = public_url
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "*"
-        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-        return resp
-
-    return _json_response({"url": public_url, "completado": completion_percentage})
+        # Usar timestamp legible para generar nombre único
+        timestamp = _get_param(request, "t")
+        if timestamp:
+            # Convertir timestamp de milisegundos a formato legible
+            try:
+                timestamp_ms = int(timestamp)
+                timestamp_date = datetime.fromtimestamp(timestamp_ms / 1000)
+                timestamp_readable = timestamp_date.strftime("%Y-%m-%d_%H-%M-%S")
+            except:
+                # Si falla la conversión, usar timestamp actual
+                timestamp_readable = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        else:
+            # Si no hay timestamp, usar el actual
+            timestamp_readable = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
+        object_name = f"{cliente}/{localidad}/{ruta_id}_{timestamp_readable}.csv"
+        
+        bucket = storage_client.bucket(export_bucket_name)
+        blob = bucket.blob(object_name)
+        
+        blob.upload_from_filename(csv_filename)
+        
+        # Hacer público el archivo
+        blob.make_public()
+        
+        # Actualizar Firestore con información de completado
+        ruta_ref.update({
+            "ultima_exportacion": firestore.SERVER_TIMESTAMP,
+            "porcentaje_completado": porcentaje_completado,
+            "archivo_csv_url": blob.public_url
+        })
+        
+        # Limpiar archivo temporal
+        os.remove(csv_filename)
+        
+        return jsonify({
+            'success': True,
+            'url': blob.public_url,
+            'filename': object_name,
+            'timestamp': timestamp_readable,
+            'porcentaje_completado': porcentaje_completado
+        }), 200, headers
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error interno: {str(e)}'
+        }), 500, headers
 
 

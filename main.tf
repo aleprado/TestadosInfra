@@ -4,6 +4,10 @@ provider "google" {
   # credentials = file(var.credentials_file)  # Comentado para usar credenciales por defecto
 }
 
+# NOTA: El cron job de exportación automática está DESACTIVADO
+# Ahora usamos la función exportCSVOnDemand que se ejecuta solo cuando se solicita
+# Para reactivar el cron, descomenta el recurso google_cloud_scheduler_job.export_csv_scheduler
+
 # Retrieve current project information for IAM bindings
 data "google_project" "current" {
   project_id = var.project_id
@@ -212,16 +216,17 @@ resource "google_pubsub_topic" "export_topic" {
 }
 
 # Crear una tarea de Cloud Scheduler para ejecutar la función cada día a las 00:00 horas
-resource "google_cloud_scheduler_job" "export_csv_scheduler" {
-  name        = "export-csv-scheduler"
-  description = "Trigger exportCSV function every day at 00:00"
-  schedule    = "0 0 * * *"
-  time_zone   = "America/Argentina/Buenos_Aires"
-  pubsub_target {
-    topic_name = google_pubsub_topic.export_topic.id
-    data       = base64encode("Trigger exportCSV function")
-  }
-}
+# DESACTIVADO: Ahora usamos exportación on-demand
+# resource "google_cloud_scheduler_job" "export_csv_scheduler" {
+#   name        = "export-csv-scheduler"
+#   description = "Trigger exportCSV function every day at 00:00"
+#   schedule    = "0 0 * * *"
+#   time_zone   = "America/Argentina/Buenos_Aires"
+#   pubsub_target {
+#     topic_name = google_pubsub_topic.export_topic.id
+#     data       = base64encode("Trigger exportCSV function")
+#   }
+# }
 
 # Hacer público el bucket de exportación para descargas anónimas
 resource "google_storage_bucket_iam_member" "export_bucket_public_read" {
