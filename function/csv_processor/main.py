@@ -7,7 +7,7 @@ CAMPOS = [
     'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
     'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior',
     'controles', 'novedades', 'lectura_actual', 'consumo_aa',
-    'porcentaje_control_aa', 'consumo_promedido_aa',
+    'porcentaje_control_aa', 'consumo_promedio_aa',
     'porcentaje_control_promedio_aa', 'observacionlecturista',
     'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura'
 ]
@@ -37,7 +37,30 @@ def procesar_csv(datos, contexto):
     bucket = cliente_storage.bucket(nombre_bucket)
     blob = bucket.blob(nombre_archivo)
 
-    lineas = blob.download_as_text().splitlines()
+    # Descargar como bytes primero para poder probar diferentes codificaciones
+    contenido_bytes = blob.download_as_bytes()
+    
+    # Lista de codificaciones comunes para archivos españoles
+    codificaciones = ['utf-8', 'iso-8859-1', 'windows-1252', 'latin1']
+    lineas = None
+    
+    # Intentar decodificar con diferentes codificaciones
+    for codificacion in codificaciones:
+        try:
+            contenido_texto = contenido_bytes.decode(codificacion)
+            lineas = contenido_texto.splitlines()
+            print(f"DEBUG: Archivo decodificado exitosamente con {codificacion}")
+            break
+        except UnicodeDecodeError as e:
+            print(f"DEBUG: Falló decodificación con {codificacion}: {e}")
+            continue
+    
+    # Si ninguna codificación funciona, usar 'ignore' como último recurso
+    if lineas is None:
+        print(f"WARNING: No se pudo decodificar con ninguna codificación, usando 'ignore'")
+        contenido_texto = contenido_bytes.decode('utf-8', errors='ignore')
+        lineas = contenido_texto.splitlines()
+
     delimitador = detectar_delimitador(lineas[0])
     primera = next(csv.reader([lineas[0]], delimiter=delimitador))
     if primera == CAMPOS:
