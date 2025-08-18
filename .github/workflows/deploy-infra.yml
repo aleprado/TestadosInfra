@@ -29,6 +29,8 @@ jobs:
           terraform_version: 1.5.7
       
       - name: Deploy
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/service-account-key.json
         run: |
           terraform init
           terraform plan
