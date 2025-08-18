@@ -10,14 +10,17 @@ app = Flask(__name__)
 
 def _get_param(request, param_name):
     """Obtiene un parámetro del request, ya sea de query params o del body JSON"""
-    if request.method == 'GET':
-        return request.args.get(param_name)
-    else:
+    # ✅ SOLUCIÓN: Buscar primero en el body JSON, luego en query params como fallback
+    if request.method == 'POST':
         try:
             body = request.get_json()
-            return body.get(param_name) if body else None
+            if body and param_name in body:
+                return body.get(param_name)
         except:
-            return None
+            pass
+    
+    # Si no se encontró en el body JSON, buscar en query params
+    return request.args.get(param_name)
 
 @functions_framework.http
 def export_csv_on_demand(request):
@@ -68,12 +71,29 @@ def export_csv_on_demand(request):
         print(f"DEBUG: - localidad: '{localidad}' (tipo: {type(localidad)})")
         print(f"DEBUG: - ruta_id: '{ruta_id}' (tipo: {type(ruta_id)})")
 
-        if not cliente or not localidad or not ruta_id:
-            error_msg = f'Faltan parámetros requeridos: cliente="{cliente}", localidad="{localidad}", ruta_id="{ruta_id}"'
+        # ✅ MEJORA: Validación más detallada de parámetros
+        missing_params = []
+        if not cliente:
+            missing_params.append("cliente")
+        if not localidad:
+            missing_params.append("localidad")
+        if not ruta_id:
+            missing_params.append("ruta_id")
+            
+        if missing_params:
+            error_msg = f'Faltan parámetros requeridos: {", ".join(missing_params)}. Recibidos: cliente="{cliente}", localidad="{localidad}", ruta_id="{ruta_id}"'
             print(f"ERROR: {error_msg}")
             return jsonify({
-                'error': error_msg
+                'error': error_msg,
+                'missing_params': missing_params,
+                'received_params': {
+                    'cliente': cliente,
+                    'localidad': localidad,
+                    'ruta_id': ruta_id
+                }
             }), 400, cors_headers
+
+        # La validación ya se hizo arriba, continuar con el procesamiento
 
         print(f"DEBUG: Exportando ruta {ruta_id} para cliente {cliente} en localidad {localidad}")
 
