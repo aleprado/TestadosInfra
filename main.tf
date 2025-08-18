@@ -262,3 +262,16 @@ resource "google_project_iam_member" "functions_firestore_user" {
   role    = "roles/datastore.user"
   member  = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
 }
+
+# 🔒 SEGURIDAD: Hacer bucket de datos privado (remover acceso público)
+resource "google_storage_bucket_iam_binding" "data_bucket_private" {
+  bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role   = "roles/storage.objectViewer"
+  members = [
+    "serviceAccount:${var.project_id}@appspot.gserviceaccount.com",
+    "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+  ]
+}
+
+# 🔒 SEGURIDAD: Las reglas de Firebase se manejan con Firebase CLI
+# desde el repositorio del frontend

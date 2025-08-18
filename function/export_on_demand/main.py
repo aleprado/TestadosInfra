@@ -44,14 +44,35 @@ def export_csv_on_demand(request):
     }
 
     try:
-        # Obtener parámetros
+        # 🔍 DEBUG: Log de todos los parámetros recibidos
+        print(f"DEBUG: Método HTTP: {request.method}")
+        print(f"DEBUG: URL completa: {request.url}")
+        print(f"DEBUG: Query params: {dict(request.args)}")
+        print(f"DEBUG: Headers: {dict(request.headers)}")
+        
+        if request.method == 'POST':
+            try:
+                body = request.get_json()
+                print(f"DEBUG: Body JSON: {body}")
+            except Exception as e:
+                print(f"DEBUG: Error parseando body JSON: {e}")
+                body = None
+        
+        # Obtener parámetros con logs detallados
         cliente = _get_param(request, 'cliente')
         localidad = _get_param(request, 'localidad')
-        ruta_id = _get_param(request, 'rutaId')
+        ruta_id = _get_param(request, 'ruta_id')
+        
+        print(f"DEBUG: Parámetros extraídos:")
+        print(f"DEBUG: - cliente: '{cliente}' (tipo: {type(cliente)})")
+        print(f"DEBUG: - localidad: '{localidad}' (tipo: {type(localidad)})")
+        print(f"DEBUG: - ruta_id: '{ruta_id}' (tipo: {type(ruta_id)})")
 
         if not cliente or not localidad or not ruta_id:
+            error_msg = f'Faltan parámetros requeridos: cliente="{cliente}", localidad="{localidad}", ruta_id="{ruta_id}"'
+            print(f"ERROR: {error_msg}")
             return jsonify({
-                'error': 'Faltan parámetros requeridos: cliente, localidad, rutaId'
+                'error': error_msg
             }), 400, cors_headers
 
         print(f"DEBUG: Exportando ruta {ruta_id} para cliente {cliente} en localidad {localidad}")
