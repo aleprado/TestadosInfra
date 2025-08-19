@@ -235,6 +235,13 @@ resource "google_storage_bucket_iam_member" "export_bucket_public_read" {
   member = "allUsers"
 }
 
+# 🔒 SEGURIDAD: Permitir acceso a usuarios autenticados de Firebase
+resource "google_storage_bucket_iam_member" "export_bucket_firebase_auth" {
+  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+  role   = "roles/storage.objectViewer"
+  member = "allAuthenticatedUsers"
+}
+
 # Permisos para escribir en el bucket de exportación (función exportCSV)
 resource "google_storage_bucket_iam_member" "export_bucket_object_admin" {
   bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
