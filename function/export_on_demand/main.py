@@ -131,10 +131,10 @@ def export_csv_on_demand(request):
 
         total_docs = 0
         completed_docs = 0
-        all_headers = set()  # Para almacenar todos los campos únicos
+        headers_definitive = []  # Lista ordenada para mantener el orden de headers
 
         with blob.open("wt", newline='') as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv.writer(csv_file, delimiter=';')
             header_written = False
 
             for subcollection in subcollections_list:
@@ -160,6 +160,8 @@ def export_csv_on_demand(request):
 
                 for doc in sorted_docs:
                     doc_data = doc.to_dict()
+                    if not doc_data.get('lectura_actual'):
+                        continue
                     print(f"DEBUG: Escribiendo documento {doc.id} con {len(doc_data)} campos")
                     
                     # Mapear campos para normalizar nombres
@@ -173,26 +175,32 @@ def export_csv_on_demand(request):
                             normalized_data['novedad'] = value
                         else:
                             normalized_data[key] = value
+
+                    normalized_data.pop('altura', None)
                     
                     # Asegurar que todos los documentos tengan el campo imagenUrl
                     if 'imagenUrl' not in normalized_data:
                         normalized_data['imagenUrl'] = ''
 
                     if not header_written:
-                        # Escribir el encabezado en el CSV
-                        headers = sorted(list(normalized_data.keys()))
-                        writer.writerow(headers)
+                        # Escribir el encabezado en el CSV y guardar el orden
+                        headers_definitive = sorted(list(normalized_data.keys()))
+                        writer.writerow(headers_definitive)
                         header_written = True
-                        print(f"DEBUG: Headers escritos: {headers}")
-                        all_headers.update(headers)
+                        print(f"DEBUG: Headers definitivos escritos: {headers_definitive}")
                     
-                    # Crear fila con todos los campos, llenando con vacío los faltantes
+                    # ✅ SOLUCIÓN: Crear fila usando el mismo orden que los headers escritos
                     row = []
-                    for header in all_headers:
+                    for header in headers_definitive:
                         row.append(normalized_data.get(header, ''))
                     
                     writer.writerow(row)
                     print(f"DEBUG: Documento {doc.id} escrito con {len(row)} campos")
+
+        # ✅ CORRECCIÓN: Hacer público el blob DESPUÉS de escribir el contenido
+        print(f"DEBUG: Haciendo público el archivo: {file_name}")
+        blob.make_public()
+        print(f"DEBUG: Archivo configurado como público exitosamente")
 
         # Calcular porcentaje de completado
         completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0
@@ -221,5 +229,4 @@ def export_csv_on_demand(request):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
-
 

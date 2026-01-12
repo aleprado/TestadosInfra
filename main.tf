@@ -65,6 +65,19 @@ resource "google_storage_bucket" "export_bucket" {
   }
 }
 
+# Hacer el bucket público para acceso directo
+resource "google_storage_bucket" "export_bucket_public_access" {
+  count  = data.google_storage_bucket.existing_export_bucket.id == null ? 1 : 0
+  name     = var.export_bucket_name
+  location = var.region
+  public_access_prevention = "inherited"
+  
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [name, location]
+  }
+}
+
 # Subir el archivo ZIP de la función CSV Processor al bucket de funciones
 data "archive_file" "csv_processor_src" {
   type        = "zip"
@@ -235,6 +248,15 @@ resource "google_storage_bucket_iam_member" "export_bucket_public_read" {
   member = "allUsers"
 }
 
+# Política de bucket para acceso público completo
+resource "google_storage_bucket_iam_binding" "export_bucket_public_policy" {
+  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
+  role   = "roles/storage.objectViewer"
+  members = [
+    "allUsers"
+  ]
+}
+
 # 🔒 SEGURIDAD: Permitir acceso a usuarios autenticados de Firebase
 resource "google_storage_bucket_iam_member" "export_bucket_firebase_auth" {
   bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
@@ -278,6 +300,46 @@ resource "google_storage_bucket_iam_binding" "data_bucket_private" {
     "serviceAccount:${var.project_id}@appspot.gserviceaccount.com",
     "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
   ]
+}
+
+# 🔒 SEGURIDAD: Permitir a usuarios autenticados de Firebase subir imágenes
+resource "google_storage_bucket_iam_member" "data_bucket_firebase_auth_write" {
+  bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role   = "roles/storage.objectCreator"
+  member = "allAuthenticatedUsers"
+}
+
+# 🔒 SEGURIDAD: Permitir a usuarios autenticados de Firebase leer sus propias imágenes
+resource "google_storage_bucket_iam_member" "data_bucket_firebase_auth_read" {
+  bucket = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
+  role   = "roles/storage.objectViewer"
+  member = "allAuthenticatedUsers"
+}
+
+# 🔒 SEGURIDAD: Permisos para el bucket por defecto de Firebase Storage (imágenes)
+resource "google_storage_bucket_iam_member" "firebase_default_bucket_auth_write" {
+  bucket = "${var.project_id}.appspot.com"
+  role   = "roles/storage.objectCreator"
+  member = "allAuthenticatedUsers"
+}
+
+resource "google_storage_bucket_iam_member" "firebase_default_bucket_auth_read" {
+  bucket = "${var.project_id}.appspot.com"
+  role   = "roles/storage.objectViewer"
+  member = "allAuthenticatedUsers"
+}
+
+# ⚠️ TEMPORAL: Permisos para usuarios anónimos (mientras se arregla la autenticación)
+resource "google_storage_bucket_iam_member" "firebase_default_bucket_anonymous_write" {
+  bucket = "${var.project_id}.appspot.com"
+  role   = "roles/storage.objectCreator"
+  member = "allUsers"
+}
+
+resource "google_storage_bucket_iam_member" "firebase_default_bucket_anonymous_read" {
+  bucket = "${var.project_id}.appspot.com"
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
 }
 
 # 🔒 SEGURIDAD: Las reglas de Firebase se manejan con Firebase CLI

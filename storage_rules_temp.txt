@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Reglas temporales: Permitir lectura y escritura a todos los usuarios
+    // ⚠️ TEMPORAL: Esto permite acceso público, usar solo para debugging
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

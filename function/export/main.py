@@ -38,9 +38,12 @@ def export_subcollections(event, context):
         # Crear un archivo CSV único para la ruta
         file_name = f'testados-rutas-exportadas/{cliente_id}/{localidad_id}/{ruta_id}.csv'
         blob = export_bucket.blob(file_name)
+        
+        # Configurar el blob para acceso público
+        blob.make_public()
 
         with blob.open("wt", newline='') as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv.writer(csv_file, delimiter=';')
             header_written = False
 
             for subcollection in subcollections:
@@ -58,12 +61,17 @@ def export_subcollections(event, context):
                 ruta.reference.update({'completado': completion_percentage})
 
                 for doc in sorted_docs:
+                    doc_data = doc.to_dict()
+                    if not doc_data.get('lectura_actual'):
+                        continue
+
+                    doc_data.pop('altura', None)
                     if not header_written:
                         # Escribir el encabezado en el CSV
-                        writer.writerow(doc.to_dict().keys())
+                        writer.writerow(doc_data.keys())
                         header_written = True
                     # Escribir los valores del documento en el CSV
-                    writer.writerow(doc.to_dict().values())
+                    writer.writerow(doc_data.values())
 
             print(f'Ruta {ruta_id} exportada a {file_name} con porcentaje tomado: {completion_percentage:.2f}%')
 
