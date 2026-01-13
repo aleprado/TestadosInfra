@@ -19,7 +19,11 @@ def detectar_delimitador(linea: str) -> str:
         return ','
     raise ValueError('Unknown delimiter')
 
-def limpiar_valor(valor: str) -> str:
+def limpiar_valor(valor) -> str:
+    if valor is None:
+        return ''
+    if not isinstance(valor, str):
+        valor = str(valor)
     valor = re.sub(r' {2,}', ' ', valor).strip()
     if valor.isdigit():
         valor = valor.lstrip('0')
@@ -80,13 +84,37 @@ def procesar_csv(datos, contexto):
     ref_localidad = ref_cliente.collection('Localidades').document(localidad_nombre)
     ref_ruta = cliente_firestore.collection('Rutas').document(nombre_documento)
 
-    ref_ruta.set({'cliente': ref_cliente, 'localidad': ref_localidad}, merge=True)
+    ref_ruta.set({
+        'cliente': ref_cliente,
+        'localidad': ref_localidad,
+        'procesamiento': {
+            'estado': 'procesando',
+            'actualizado': firestore.SERVER_TIMESTAMP,
+        },
+    }, merge=True)
     ref_localidad.set({'rutas': firestore.ArrayUnion([ref_ruta])}, merge=True)
 
-    subcoleccion = ref_ruta.collection('RutaRecorrido')
-    for indice, fila in enumerate(lector):
-        fila = {k: limpiar_valor(v) for k, v in fila.items()}
-        subcoleccion.document(str(indice)).set(fila)
+    try:
+        subcoleccion = ref_ruta.collection('RutaRecorrido')
+        for indice, fila in enumerate(lector):
+            fila = {k: limpiar_valor(v) for k, v in fila.items() if k is not None}
+            subcoleccion.document(str(indice)).set(fila)
 
-    print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
-    return len(lineas)
+        ref_ruta.set({
+            'procesamiento': {
+                'estado': 'ok',
+                'filas': len(lineas),
+                'actualizado': firestore.SERVER_TIMESTAMP,
+            }
+        }, merge=True)
+        print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
+        return len(lineas)
+    except Exception as exc:
+        ref_ruta.set({
+            'procesamiento': {
+                'estado': 'error',
+                'mensaje': str(exc),
+                'actualizado': firestore.SERVER_TIMESTAMP,
+            }
+        }, merge=True)
+        raise
