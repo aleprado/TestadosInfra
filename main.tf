@@ -92,20 +92,6 @@ resource "google_storage_bucket_object" "upload_csv_trigger" {
   depends_on = [google_storage_bucket.function_bucket]
 }
 
-# Subir el archivo ZIP de la función Export Subcollections al bucket de funciones
-data "archive_file" "export_src" {
-  type        = "zip"
-  source_dir  = "${path.module}/function/export"
-  output_path = "${path.module}/function/export/export_trigger.zip"
-}
-
-resource "google_storage_bucket_object" "upload_export_trigger" {
-  name       = "export_trigger.zip"
-  bucket     = data.google_storage_bucket.existing_function_bucket.name
-  source     = data.archive_file.export_src.output_path
-  depends_on = [google_storage_bucket.function_bucket]
-}
-
 # Subir el archivo ZIP de la función HTTP de exportación on-demand
 data "archive_file" "export_on_demand_src" {
   type        = "zip"
@@ -147,33 +133,6 @@ resource "google_cloudfunctions2_function" "csv_processor" {
       attribute = "bucket"
       value     = coalesce(data.google_storage_bucket.existing_data_bucket.name, var.data_bucket_name)
     }
-  }
-}
-
-# Crear la función de Cloud Functions para exportar subcolecciones
-resource "google_cloudfunctions2_function" "export_csv" {
-  name     = "exportCSV"
-  location = var.region
-
-  build_config {
-    runtime     = "python310"
-    entry_point = "export_subcollections"
-    source {
-      storage_source {
-        bucket = google_storage_bucket_object.upload_export_trigger.bucket
-        object = google_storage_bucket_object.upload_export_trigger.name
-      }
-    }
-  }
-
-  service_config {
-    available_memory = "256M"
-  }
-
-  event_trigger {
-    trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic   = google_pubsub_topic.export_topic.id
   }
 }
 
@@ -221,11 +180,6 @@ resource "google_project_iam_member" "functions_firestore_user_compute_sa" {
   project = var.project_id
   role    = "roles/datastore.user"
   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
-}
-
-# Crear un Pub/Sub topic para disparar la función exportCSV
-resource "google_pubsub_topic" "export_topic" {
-  name = "export-csv-topic"
 }
 
 # Crear una tarea de Cloud Scheduler para ejecutar la función cada día a las 00:00 horas

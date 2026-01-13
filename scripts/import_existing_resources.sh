@@ -34,14 +34,6 @@ terraform import -allow-missing-config google_storage_bucket.export_bucket $EXPO
 if gcloud functions describe csvProcessor --region "$REGION" --gen2 >/dev/null 2>&1; then
   terraform import -allow-missing-config google_cloudfunctions2_function.csv_processor $REGION/csvProcessor || true
 fi
-if gcloud functions describe exportCSV --region "$REGION" --gen2 >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_cloudfunctions2_function.export_csv $REGION/exportCSV || true
-fi
-
-# Import Pub/Sub topic if it exists
-if gcloud pubsub topics describe export-csv-topic >/dev/null 2>&1; then
-  terraform import -allow-missing-config google_pubsub_topic.export_topic projects/$PROJECT_ID/topics/export-csv-topic || true
-fi
 
 # Import Cloud Scheduler job if it exists
 if gcloud scheduler jobs describe export-csv-scheduler --location "$REGION" >/dev/null 2>&1; then

@@ -19,17 +19,9 @@ if gcloud scheduler jobs describe export-csv-scheduler --location "$REGION" >/de
   gcloud scheduler jobs delete export-csv-scheduler --location "$REGION" --quiet || true
 fi
 
-# Delete Pub/Sub topic if it exists
-if gcloud pubsub topics describe export-csv-topic >/dev/null 2>&1; then
-  gcloud pubsub topics delete export-csv-topic --quiet || true
-fi
-
 # Delete Cloud Functions if they exist
 if gcloud functions describe csvProcessor --region "$REGION" --gen2 >/dev/null 2>&1; then
   gcloud functions delete csvProcessor --region "$REGION" --gen2 --quiet || true
-fi
-if gcloud functions describe exportCSV --region "$REGION" --gen2 >/dev/null 2>&1; then
-  gcloud functions delete exportCSV --region "$REGION" --gen2 --quiet || true
 fi
 
 # Buckets are preserved between runs. They will be created if missing in
