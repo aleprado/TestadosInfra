@@ -10,7 +10,7 @@ CAMPOS = [
     'porcentaje_control_aa', 'consumo_promedio_aa',
     'porcentaje_control_promedio_aa', 'observacionlecturista',
     'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura',
-    'titular', 'fecha_hora_edicion'
+    'titular'
 ]
 
 def detectar_delimitador(linea: str) -> str:
@@ -23,9 +23,16 @@ def detectar_delimitador(linea: str) -> str:
 def limpiar_valor(valor) -> str:
     if valor is None:
         return ''
-    if not isinstance(valor, str):
+    if isinstance(valor, bytes):
+        valor = valor.decode('utf-8', errors='ignore')
+    elif not isinstance(valor, str):
         valor = str(valor)
-    valor = re.sub(r' {2,}', ' ', valor).strip()
+    if not isinstance(valor, (str, bytes)):
+        return ''
+    try:
+        valor = re.sub(r' {2,}', ' ', valor).strip()
+    except TypeError:
+        valor = re.sub(r' {2,}', ' ', str(valor)).strip()
     if valor.isdigit():
         valor = valor.lstrip('0')
         if valor == '':
