@@ -45,6 +45,8 @@ def export_subcollections(event, context):
         with blob.open("wt", newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
             header_written = False
+            headers_definitive = []
+            campos_extra = ['titular', 'fecha_hora_edicion']
 
             for subcollection in subcollections:
                 documents = subcollection.stream()
@@ -68,10 +70,14 @@ def export_subcollections(event, context):
                     doc_data.pop('altura', None)
                     if not header_written:
                         # Escribir el encabezado en el CSV
-                        writer.writerow(doc_data.keys())
+                        headers_definitive = list(doc_data.keys())
+                        for campo in campos_extra:
+                            if campo not in headers_definitive:
+                                headers_definitive.append(campo)
+                        writer.writerow(headers_definitive)
                         header_written = True
                     # Escribir los valores del documento en el CSV
-                    writer.writerow(doc_data.values())
+                    writer.writerow([doc_data.get(key, '') for key in headers_definitive])
 
             print(f'Ruta {ruta_id} exportada a {file_name} con porcentaje tomado: {completion_percentage:.2f}%')
 

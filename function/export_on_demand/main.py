@@ -132,6 +132,7 @@ def export_csv_on_demand(request):
         total_docs = 0
         completed_docs = 0
         headers_definitive = []  # Lista ordenada para mantener el orden de headers
+        campos_extra = ['titular', 'fecha_hora_edicion']
 
         with blob.open("wt", newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
@@ -185,6 +186,9 @@ def export_csv_on_demand(request):
                     if not header_written:
                         # Escribir el encabezado en el CSV y guardar el orden
                         headers_definitive = sorted(list(normalized_data.keys()))
+                        for campo in campos_extra:
+                            if campo not in headers_definitive:
+                                headers_definitive.append(campo)
                         writer.writerow(headers_definitive)
                         header_written = True
                         print(f"DEBUG: Headers definitivos escritos: {headers_definitive}")
@@ -229,4 +233,3 @@ def export_csv_on_demand(request):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
-

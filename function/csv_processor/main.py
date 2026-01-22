@@ -9,7 +9,8 @@ CAMPOS = [
     'controles', 'novedades', 'lectura_actual', 'consumo_aa',
     'porcentaje_control_aa', 'consumo_promedio_aa',
     'porcentaje_control_promedio_aa', 'observacionlecturista',
-    'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura'
+    'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura',
+    'titular', 'fecha_hora_edicion'
 ]
 
 def detectar_delimitador(linea: str) -> str:
