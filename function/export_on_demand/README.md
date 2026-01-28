@@ -1,7 +1,7 @@
 # Función de Exportación On-Demand
 
 ## Descripción
-Esta función permite exportar datos de una ruta específica a CSV cuando se solicita, en lugar de ejecutarse automáticamente por cron.
+Esta función permite exportar datos de una ruta específica a CSV cuando se solicita.
 
 ## Formato de Nombres de Archivo
 Los archivos CSV generados ahora tienen nombres con timestamps legibles para facilitar el seguimiento:

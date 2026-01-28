@@ -3,6 +3,8 @@ import os
 import re
 from google.cloud import firestore, storage
 
+VERSION = "2026-01-22-01"
+
 CAMPOS = [
     'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
     'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior',
@@ -40,6 +42,7 @@ def limpiar_valor(valor) -> str:
     return '' if valor == '0' else valor
 
 def procesar_csv(datos, contexto):
+    print(f"csv_processor version: {VERSION}")
     nombre_bucket = datos['bucket']
     nombre_archivo = datos['name']
 
@@ -104,9 +107,19 @@ def procesar_csv(datos, contexto):
 
     try:
         subcoleccion = ref_ruta.collection('RutaRecorrido')
+        batch = cliente_firestore.batch()
+        batch_count = 0
         for indice, fila in enumerate(lector):
             fila = {k: limpiar_valor(v) for k, v in fila.items() if k is not None}
-            subcoleccion.document(str(indice)).set(fila)
+            doc_ref = subcoleccion.document(str(indice))
+            batch.set(doc_ref, fila)
+            batch_count += 1
+            if batch_count >= 400:
+                batch.commit()
+                batch = cliente_firestore.batch()
+                batch_count = 0
+        if batch_count:
+            batch.commit()
 
         ref_ruta.set({
             'procesamiento': {

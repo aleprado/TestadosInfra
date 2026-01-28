@@ -7,6 +7,70 @@ from flask import Flask, request, jsonify
 import functions_framework
 
 app = Flask(__name__)
+SERVICE_FIELD = 'servicio'
+DROP_FIELDS = {
+    'latitud',
+    'longitud',
+    'altura',
+    'imagenUrl',
+    'consumo_aa',
+    'consumo_promedio_aa',
+    'controlado',
+    'esta_cortado',
+    'observacionlecturista',
+    'porcentaje_control_aa',
+    'porcentaje_control_promedio_aa',
+}
+
+def _parse_bool(value, default=False):
+    """Parsea booleanos desde query/body."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'true', '1', 'yes', 'y', 'si'}:
+            return True
+        if normalized in {'false', '0', 'no', 'n'}:
+            return False
+    return default
+
+def _reading_present_default(value):
+    """Replica la lógica histórica: cualquier falsy se considera sin lectura."""
+    return bool(value)
+
+def _reading_present_include_zero(value):
+    """Permite lectura 0 sin cambiar el criterio para strings vacíos o None."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (int, float)):
+        return True
+    return bool(value)
+
+def _reading_predicate(include_zero):
+    return _reading_present_include_zero if include_zero else _reading_present_default
+
+def _build_headers(data, extra_fields, service_field=SERVICE_FIELD):
+    headers = sorted(data.keys())
+    if service_field in headers:
+        headers.remove(service_field)
+    for campo in extra_fields:
+        if campo not in headers and campo != service_field:
+            headers.append(campo)
+    if service_field not in headers:
+        headers.append(service_field)
+    return headers
+
+def _row_from_headers(data, headers):
+    return [data.get(header, '') for header in headers]
+
+def _filter_export_fields(data):
+    return {key: value for key, value in data.items() if key not in DROP_FIELDS}
 
 def _get_param(request, param_name):
     """Obtiene un parámetro del request, ya sea de query params o del body JSON"""
@@ -65,11 +129,13 @@ def export_csv_on_demand(request):
         cliente = _get_param(request, 'cliente')
         localidad = _get_param(request, 'localidad')
         ruta_id = _get_param(request, 'ruta_id')
+        include_zero = _parse_bool(_get_param(request, 'include_zero'), default=False)
         
         print(f"DEBUG: Parámetros extraídos:")
         print(f"DEBUG: - cliente: '{cliente}' (tipo: {type(cliente)})")
         print(f"DEBUG: - localidad: '{localidad}' (tipo: {type(localidad)})")
         print(f"DEBUG: - ruta_id: '{ruta_id}' (tipo: {type(ruta_id)})")
+        print(f"DEBUG: - include_zero: '{include_zero}' (tipo: {type(include_zero)})")
 
         # ✅ MEJORA: Validación más detallada de parámetros
         missing_params = []
@@ -96,6 +162,7 @@ def export_csv_on_demand(request):
         # La validación ya se hizo arriba, continuar con el procesamiento
 
         print(f"DEBUG: Exportando ruta {ruta_id} para cliente {cliente} en localidad {localidad}")
+        print(f"DEBUG: include_zero={include_zero}")
 
         # Inicializar clientes
         firestore_client = firestore.Client()
@@ -133,6 +200,7 @@ def export_csv_on_demand(request):
         completed_docs = 0
         headers_definitive = []  # Lista ordenada para mantener el orden de headers
         campos_extra = ['titular', 'fecha_hora_edicion']
+        has_reading = _reading_predicate(include_zero)
 
         with blob.open("wt", newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
@@ -155,14 +223,12 @@ def export_csv_on_demand(request):
                 sorted_docs = sorted(doc_list, key=lambda d: int(d.id))
                 print(f"DEBUG: Procesando {len(sorted_docs)} documentos en {subcollection.id}")
 
-                # Contar documentos completados
-                total_docs += len(sorted_docs)
-                completed_docs += sum(1 for doc in sorted_docs if doc.to_dict().get('lectura_actual'))
-
                 for doc in sorted_docs:
                     doc_data = doc.to_dict()
-                    if not doc_data.get('lectura_actual'):
+                    total_docs += 1
+                    if not has_reading(doc_data.get('lectura_actual')):
                         continue
+                    completed_docs += 1
                     print(f"DEBUG: Escribiendo documento {doc.id} con {len(doc_data)} campos")
                     
                     # Mapear campos para normalizar nombres
@@ -177,27 +243,20 @@ def export_csv_on_demand(request):
                         else:
                             normalized_data[key] = value
 
+                    normalized_data = _filter_export_fields(normalized_data)
                     normalized_data.pop('altura', None)
-                    
-                    # Asegurar que todos los documentos tengan el campo imagenUrl
-                    if 'imagenUrl' not in normalized_data:
-                        normalized_data['imagenUrl'] = ''
+                    if not normalized_data:
+                        continue
 
                     if not header_written:
                         # Escribir el encabezado en el CSV y guardar el orden
-                        headers_definitive = sorted(list(normalized_data.keys()))
-                        for campo in campos_extra:
-                            if campo not in headers_definitive:
-                                headers_definitive.append(campo)
+                        headers_definitive = _build_headers(normalized_data, campos_extra)
                         writer.writerow(headers_definitive)
                         header_written = True
                         print(f"DEBUG: Headers definitivos escritos: {headers_definitive}")
                     
                     # ✅ SOLUCIÓN: Crear fila usando el mismo orden que los headers escritos
-                    row = []
-                    for header in headers_definitive:
-                        row.append(normalized_data.get(header, ''))
-                    
+                    row = _row_from_headers(normalized_data, headers_definitive)
                     writer.writerow(row)
                     print(f"DEBUG: Documento {doc.id} escrito con {len(row)} campos")
 

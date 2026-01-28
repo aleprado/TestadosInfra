@@ -14,11 +14,6 @@ EXPORT_BUCKET_NAME=${EXPORT_BUCKET_NAME:-testados-rutas-exportadas}
 TF_VAR_credentials_file="${GOOGLE_APPLICATION_CREDENTIALS}"
 export TF_VAR_credentials_file
 
-# Delete Cloud Scheduler job if it exists
-if gcloud scheduler jobs describe export-csv-scheduler --location "$REGION" >/dev/null 2>&1; then
-  gcloud scheduler jobs delete export-csv-scheduler --location "$REGION" --quiet || true
-fi
-
 # Delete Cloud Functions if they exist
 if gcloud functions describe csvProcessor --region "$REGION" --gen2 >/dev/null 2>&1; then
   gcloud functions delete csvProcessor --region "$REGION" --gen2 --quiet || true
