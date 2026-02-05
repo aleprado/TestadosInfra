@@ -6,13 +6,7 @@ from google.cloud import firestore, storage
 VERSION = "2026-01-22-01"
 
 CAMPOS = [
-    'zona', 'orden', 'servicio', 'estado', 'usuario', 'direccion', 'localidad',
-    'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior',
-    'controles', 'novedades', 'lectura_actual', 'consumo_aa',
-    'porcentaje_control_aa', 'consumo_promedio_aa',
-    'porcentaje_control_promedio_aa', 'observacionlecturista',
-    'fecha_hora_lectura', 'esta_cortado', 'latitud', 'longitud', 'altura',
-    'titular'
+    'orden', 'servicio', 'estado', 'usuario', 'direccion', 'titular', 'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior', 'consumo_aa', 'porcentaje_control_aa', 'consumo_promedio_aa', 'porcentaje_control_promedio_aa', 'observacionlecturista'
 ]
 
 def detectar_delimitador(linea: str) -> str:
