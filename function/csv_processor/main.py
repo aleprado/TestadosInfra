@@ -9,6 +9,16 @@ CAMPOS = [
     'orden', 'servicio', 'estado', 'usuario', 'direccion', 'titular', 'medidor', 'digitos', 'frecuencia', 'categoria', 'lectura_anterior', 'consumo_aa', 'porcentaje_control_aa', 'consumo_promedio_aa', 'porcentaje_control_promedio_aa', 'observacionlecturista'
 ]
 
+def normalizar_nombre_campo(valor: str) -> str:
+    if valor is None:
+        return ''
+    texto = str(valor).strip().strip('"').strip("'")
+    return re.sub(r'\s+', '', texto).lower()
+
+def es_fila_encabezado(fila) -> bool:
+    normalizada = [normalizar_nombre_campo(celda) for celda in fila]
+    return normalizada == CAMPOS
+
 def detectar_delimitador(linea: str) -> str:
     if ';' in linea:
         return ';'
@@ -70,9 +80,12 @@ def procesar_csv(datos, contexto):
         contenido_texto = contenido_bytes.decode('utf-8', errors='ignore')
         lineas = contenido_texto.splitlines()
 
+    if not lineas:
+        raise ValueError('archivo vacío')
+
     delimitador = detectar_delimitador(lineas[0])
     primera = next(csv.reader([lineas[0]], delimiter=delimitador))
-    if primera == CAMPOS:
+    if es_fila_encabezado(primera):
         lineas = lineas[1:]
     lector = csv.DictReader(lineas, delimiter=delimitador, fieldnames=CAMPOS)
 
@@ -103,11 +116,13 @@ def procesar_csv(datos, contexto):
         subcoleccion = ref_ruta.collection('RutaRecorrido')
         batch = cliente_firestore.batch()
         batch_count = 0
+        total_filas_procesadas = 0
         for indice, fila in enumerate(lector):
             fila = {k: limpiar_valor(v) for k, v in fila.items() if k is not None}
             doc_ref = subcoleccion.document(str(indice))
             batch.set(doc_ref, fila)
             batch_count += 1
+            total_filas_procesadas += 1
             if batch_count >= 400:
                 batch.commit()
                 batch = cliente_firestore.batch()
@@ -118,12 +133,12 @@ def procesar_csv(datos, contexto):
         ref_ruta.set({
             'procesamiento': {
                 'estado': 'ok',
-                'filas': len(lineas),
+                'filas': total_filas_procesadas,
                 'actualizado': firestore.SERVER_TIMESTAMP,
             }
         }, merge=True)
-        print(f"Processed {len(lineas)} lines from {nombre_archivo}.")
-        return len(lineas)
+        print(f"Processed {total_filas_procesadas} lines from {nombre_archivo}.")
+        return total_filas_procesadas
     except Exception as exc:
         ref_ruta.set({
             'procesamiento': {

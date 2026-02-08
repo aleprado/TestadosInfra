@@ -7,19 +7,33 @@ from flask import Flask, request, jsonify
 import functions_framework
 
 app = Flask(__name__)
-SERVICE_FIELD = 'servicio'
-DROP_FIELDS = {
+EXPORT_FIELD_ORDER = [
+    'orden',
+    'servicio',
+    'estado',
+    'usuario',
+    'direccion',
+    'titular',
+    'medidor',
+    'digitos',
+    'frecuencia',
+    'categoria',
+    'lectura_anterior',
+    'consumo_aa',
+    'porcentaje_control_aa',
+    'consumo_promedio_aa',
+    'porcentaje_control_promedio_aa',
+    'observacionlecturista',
+    'lectura_actual',
+    'fecha_hora_lectura',
+    'fecha_hora_edicion',
+    'novedades',
     'latitud',
     'longitud',
-    'altura',
-    'imagenUrl',
-    'consumo_aa',
-    'consumo_promedio_aa',
-    'controlado',
-    'esta_cortado',
-    'observacionlecturista',
-    'porcentaje_control_aa',
-    'porcentaje_control_promedio_aa',
+]
+FIELD_ALIASES = {
+    'fechaToma': 'fecha_hora_lectura',
+    'novedad': 'novedades',
 }
 
 def _parse_bool(value, default=False):
@@ -55,22 +69,15 @@ def _reading_present_include_zero(value):
 def _reading_predicate(include_zero):
     return _reading_present_include_zero if include_zero else _reading_present_default
 
-def _build_headers(data, extra_fields, service_field=SERVICE_FIELD):
-    headers = sorted(data.keys())
-    if service_field in headers:
-        headers.remove(service_field)
-    for campo in extra_fields:
-        if campo not in headers and campo != service_field:
-            headers.append(campo)
-    if service_field not in headers:
-        headers.append(service_field)
-    return headers
+def _normalize_export_data(data):
+    normalized = {}
+    for key, value in data.items():
+        canonical = FIELD_ALIASES.get(key, key)
+        normalized[canonical] = value
+    return normalized
 
-def _row_from_headers(data, headers):
-    return [data.get(header, '') for header in headers]
-
-def _filter_export_fields(data):
-    return {key: value for key, value in data.items() if key not in DROP_FIELDS}
+def _row_for_export(data):
+    return [data.get(field, '') for field in EXPORT_FIELD_ORDER]
 
 def _get_param(request, param_name):
     """Obtiene un parámetro del request, ya sea de query params o del body JSON"""
@@ -198,13 +205,11 @@ def export_csv_on_demand(request):
 
         total_docs = 0
         completed_docs = 0
-        headers_definitive = []  # Lista ordenada para mantener el orden de headers
-        campos_extra = ['titular', 'fecha_hora_edicion']
         has_reading = _reading_predicate(include_zero)
 
         with blob.open("wt", newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
-            header_written = False
+            writer.writerow(EXPORT_FIELD_ORDER)
 
             for subcollection in subcollections_list:
                 print(f"DEBUG: Procesando subcolección: {subcollection.id}")
@@ -226,37 +231,12 @@ def export_csv_on_demand(request):
                 for doc in sorted_docs:
                     doc_data = doc.to_dict()
                     total_docs += 1
-                    if not has_reading(doc_data.get('lectura_actual')):
+                    normalized_data = _normalize_export_data(doc_data)
+                    if not has_reading(normalized_data.get('lectura_actual')):
                         continue
                     completed_docs += 1
-                    print(f"DEBUG: Escribiendo documento {doc.id} con {len(doc_data)} campos")
-                    
-                    # Mapear campos para normalizar nombres
-                    normalized_data = {}
-                    for key, value in doc_data.items():
-                        if key == 'controles':
-                            normalized_data['controlado'] = value
-                        elif key == 'fecha_hora_lectura':
-                            normalized_data['fechaToma'] = value
-                        elif key == 'novedades':
-                            normalized_data['novedad'] = value
-                        else:
-                            normalized_data[key] = value
-
-                    normalized_data = _filter_export_fields(normalized_data)
-                    normalized_data.pop('altura', None)
-                    if not normalized_data:
-                        continue
-
-                    if not header_written:
-                        # Escribir el encabezado en el CSV y guardar el orden
-                        headers_definitive = _build_headers(normalized_data, campos_extra)
-                        writer.writerow(headers_definitive)
-                        header_written = True
-                        print(f"DEBUG: Headers definitivos escritos: {headers_definitive}")
-                    
-                    # ✅ SOLUCIÓN: Crear fila usando el mismo orden que los headers escritos
-                    row = _row_from_headers(normalized_data, headers_definitive)
+                    print(f"DEBUG: Escribiendo documento {doc.id} con {len(normalized_data)} campos")
+                    row = _row_for_export(normalized_data)
                     writer.writerow(row)
                     print(f"DEBUG: Documento {doc.id} escrito con {len(row)} campos")
 
