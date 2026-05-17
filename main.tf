@@ -326,11 +326,9 @@ resource "google_cloud_run_v2_service_iam_member" "invoker_all_users_create_clie
 }
 
 # Permiso para que la función pueda gestionar usuarios de Firebase Auth
-resource "google_project_iam_member" "functions_firebase_auth_admin" {
-  project = var.project_id
-  role    = "roles/firebaseauth.admin"
-  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
-}
+# ⚠️ GESTIONADO MANUALMENTE desde la consola de GCP (IAM & Admin)
+# Se asignó roles/firebaseauth.admin a la compute SA desde la consola
+# porque la SA de Terraform no tiene permiso para asignar roles IAM a nivel de proyecto.
 
 # 🔒 SEGURIDAD: Las reglas de Firebase se manejan con Firebase CLI
 # desde el repositorio del frontend
