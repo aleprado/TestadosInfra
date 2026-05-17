@@ -17,3 +17,13 @@ output "csv_processor_function_name" {
   description = "El nombre de la función de Cloud Functions creada para procesar CSV"
   value       = google_cloudfunctions2_function.csv_processor.name
 }
+
+output "export_csv_on_demand_url" {
+  description = "La URL de la función HTTP de exportación on-demand"
+  value       = google_cloudfunctions2_function.export_csv_on_demand.url
+}
+
+output "create_client_auth_url" {
+  description = "La URL de la función HTTP para crear clientes"
+  value       = google_cloudfunctions2_function.create_client_auth.url
+}

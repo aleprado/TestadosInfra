@@ -34,9 +34,11 @@ jobs:
           TF_CLI_ARGS_plan: >-
             -replace=google_cloudfunctions2_function.csv_processor
             -replace=google_cloudfunctions2_function.export_csv_on_demand
+            -replace=google_cloudfunctions2_function.create_client_auth
           TF_CLI_ARGS_apply: >-
             -replace=google_cloudfunctions2_function.csv_processor
             -replace=google_cloudfunctions2_function.export_csv_on_demand
+            -replace=google_cloudfunctions2_function.create_client_auth
         run: |
           terraform init
           terraform plan -out=tfplan

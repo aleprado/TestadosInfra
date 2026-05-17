@@ -279,5 +279,58 @@ resource "google_storage_bucket_iam_member" "firebase_default_bucket_anonymous_r
   member = "allUsers"
 }
 
+# ─── Cloud Function: createClientAuth (Node.js) ──────────────────────────────
+
+# Subir el archivo ZIP de la función createClientAuth al bucket de funciones
+data "archive_file" "create_client_auth_src" {
+  type        = "zip"
+  source_dir  = "${path.module}/function/create_client_auth"
+  output_path = "${path.module}/function/create_client_auth/create_client_auth.zip"
+}
+
+resource "google_storage_bucket_object" "upload_create_client_auth" {
+  name       = "create_client_auth.zip"
+  bucket     = data.google_storage_bucket.existing_function_bucket.name
+  source     = data.archive_file.create_client_auth_src.output_path
+  depends_on = [google_storage_bucket.function_bucket]
+}
+
+# Crear la función de Cloud Functions para crear clientes (HTTP, Node.js)
+resource "google_cloudfunctions2_function" "create_client_auth" {
+  name     = "createClientAuth"
+  location = var.region
+
+  build_config {
+    runtime     = "nodejs20"
+    entry_point = "createClientAuth"
+    source {
+      storage_source {
+        bucket = google_storage_bucket_object.upload_create_client_auth.bucket
+        object = google_storage_bucket_object.upload_create_client_auth.name
+      }
+    }
+  }
+
+  service_config {
+    available_memory = "256M"
+  }
+}
+
+# Permitir invocación pública de la función HTTP (la autenticación se maneja internamente con Firebase tokens)
+resource "google_cloud_run_v2_service_iam_member" "invoker_all_users_create_client_auth" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.create_client_auth.service_config[0].service
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Permiso para que la función pueda gestionar usuarios de Firebase Auth
+resource "google_project_iam_member" "functions_firebase_auth_admin" {
+  project = var.project_id
+  role    = "roles/firebaseauth.admin"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # 🔒 SEGURIDAD: Las reglas de Firebase se manejan con Firebase CLI
 # desde el repositorio del frontend

@@ -1,0 +1,13 @@
+{
+  "name": "create-client-auth",
+  "version": "1.0.0",
+  "description": "Cloud Function para crear usuarios de cliente en Firebase Auth y Firestore",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "firebase-admin": "^12.0.0"
+  }
+}
