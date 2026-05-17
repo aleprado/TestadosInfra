@@ -6,8 +6,7 @@ admin.initializeApp();
 // Emails de administradores autorizados (hardcoded)
 // También se verifican contra la colección "Admins" de Firestore
 const ADMIN_EMAILS = [
-  // Agregar emails de admin aquí, ejemplo:
-  // 'admin@testados.com',
+  'pdtomaestados@gmail.com'
 ];
 
 functions.http('createClientAuth', async (req, res) => {
