@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Verifica si el usuario autenticado es el administrador principal
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'pdtomaestados@gmail.com';
+    }
+
+    // Helper: Verifica si el usuario autenticado es el dueño de la cuenta de cliente
+    function isClienteOwner(clienteId) {
+      return request.auth != null && (
+        isAdmin() || 
+        get(/databases/$(database)/documents/Clientes/$(clienteId)).data.email == request.auth.token.email
+      );
+    }
+
+    // --- COLECCIÓN: Clientes ---
+    match /Clientes/{clienteId} {
+      // Un cliente puede leer sus propios datos; el admin puede leer y escribir todos
+      allow read: if request.auth != null && (isAdmin() || resource.data.email == request.auth.token.email);
+      allow write: if isAdmin();
+      
+      // Subcolección: Localidades (dentro de Clientes)
+      match /Localidades/{localidadId} {
+        // Solo el cliente dueño de sus datos o el administrador pueden leer y modificar localidades
+        allow read, write: if isClienteOwner(clienteId);
+      }
+    }
+    
+    // --- COLECCIÓN: Sistema ---
+    match /Sistema/Novedades {
+      // Permitimos lectura pública para que la app móvil acceda al catálogo de novedades
+      allow read: if true;
+      // Solo el administrador puede modificar el catálogo del sistema
+      allow write: if isAdmin();
+    }
+    
+    // --- COLECCIÓN: Usuarios ---
+    match /Usuarios/{userId} {
+      // La app móvil necesita buscar usuarios de forma anónima para el login simple por email
+      allow read: if true;
+      // Solo operadores o administradores autenticados pueden crear, modificar o eliminar usuarios
+      allow write: if request.auth != null;
+    }
+    
+    // --- COLECCIÓN: Rutas ---
+    match /Rutas/{rutaId} {
+      // Acceso de lectura público para que la app móvil acceda a la información de la ruta
+      allow read: if true;
+      // La creación y eliminación de rutas solo puede ser hecha por usuarios web autenticados o admin
+      allow create, delete: if request.auth != null;
+      // La app móvil puede actualizar lecturas, pero impedimos que cambie el cliente o la localidad de la ruta
+      allow update: if request.auth != null || (
+        request.resource.data.cliente == resource.data.cliente && 
+        request.resource.data.localidad == resource.data.localidad
+      );
+      
+      // Subcolección: RutaRecorrido (puntos de medición de la ruta)
+      match /RutaRecorrido/{recorridoId} {
+        allow read: if true;
+        // Solo usuarios autenticados pueden crear o eliminar mediciones (desde el panel)
+        allow create, delete: if request.auth != null;
+        // La app móvil (anónima) puede actualizar las lecturas y estados de medición
+        allow update: if true;
+      }
+    }
+  }
+}

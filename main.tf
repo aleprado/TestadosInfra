@@ -306,5 +306,19 @@ resource "google_cloud_run_v2_service_iam_member" "invoker_all_users_create_clie
 # Se asignó roles/firebaseauth.admin a la compute SA desde la consola
 # porque la SA de Terraform no tiene permiso para asignar roles IAM a nivel de proyecto.
 
-# 🔒 SEGURIDAD: Las reglas de Firebase se manejan con Firebase CLI
-# desde el repositorio del frontend
+# 🔒 SEGURIDAD: Reglas de Firestore desplegadas desde el repositorio de infraestructura
+resource "google_firebaserules_ruleset" "firestore" {
+  project = var.project_id
+  source {
+    files {
+      name    = "firestore.rules"
+      content = file("${path.module}/firestore.rules")
+    }
+  }
+}
+
+resource "google_firebaserules_release" "firestore" {
+  name         = "cloud.firestore"
+  project      = var.project_id
+  ruleset_name = google_firebaserules_ruleset.firestore.name
+}
