@@ -61,18 +61,7 @@ resource "google_storage_bucket" "export_bucket" {
   }
 }
 
-# Hacer el bucket público para acceso directo
-resource "google_storage_bucket" "export_bucket_public_access" {
-  count  = data.google_storage_bucket.existing_export_bucket.id == null ? 1 : 0
-  name     = var.export_bucket_name
-  location = var.region
-  public_access_prevention = "inherited"
-  
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [name, location]
-  }
-}
+# Eliminado: export_bucket_public_access para forzar privacidad
 
 # Subir el archivo ZIP de la función CSV Processor al bucket de funciones
 data "archive_file" "csv_processor_src" {
@@ -178,21 +167,8 @@ resource "google_project_iam_member" "functions_firestore_user_compute_sa" {
   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
-# Hacer público el bucket de exportación para descargas anónimas
-resource "google_storage_bucket_iam_member" "export_bucket_public_read" {
-  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
-  role   = "roles/storage.objectViewer"
-  member = "allUsers"
-}
-
-# Política de bucket para acceso público completo
-resource "google_storage_bucket_iam_binding" "export_bucket_public_policy" {
-  bucket = coalesce(data.google_storage_bucket.existing_export_bucket.name, var.export_bucket_name)
-  role   = "roles/storage.objectViewer"
-  members = [
-    "allUsers"
-  ]
-}
+# Hacer el bucket de exportación privado (antes era público)
+# La función de exportación ahora usa Signed URLs
 
 # 🔒 SEGURIDAD: Permitir acceso a usuarios autenticados de Firebase
 resource "google_storage_bucket_iam_member" "export_bucket_firebase_auth" {
