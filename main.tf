@@ -322,3 +322,8 @@ resource "google_firebaserules_release" "firestore" {
   project      = var.project_id
   ruleset_name = google_firebaserules_ruleset.firestore.name
 }
+
+import {
+  id = "projects/estado-eb18c/releases/cloud.firestore"
+  to = google_firebaserules_release.firestore
+}
