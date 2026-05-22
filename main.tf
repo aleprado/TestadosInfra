@@ -167,11 +167,15 @@ resource "google_project_iam_member" "functions_firestore_user_compute_sa" {
   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
-resource "google_project_iam_member" "compute_sa_token_creator" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountTokenCreator"
-  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
-}
+# Permiso para generar tokens (Signed URLs)
+# ⚠️ GESTIONADO MANUALMENTE desde la consola de GCP (IAM & Admin)
+# Se debe asignar roles/iam.serviceAccountTokenCreator a la compute SA (749071992711-compute@...)
+# desde la consola porque la SA de Terraform no tiene permiso para asignar roles IAM a nivel de proyecto.
+# resource "google_project_iam_member" "compute_sa_token_creator" {
+#   project = var.project_id
+#   role    = "roles/iam.serviceAccountTokenCreator"
+#   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+# }
 
 
 # Hacer el bucket de exportación privado (antes era público)
