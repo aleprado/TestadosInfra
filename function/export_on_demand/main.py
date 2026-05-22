@@ -1,6 +1,8 @@
 import os
 import csv
 from datetime import datetime, timedelta
+import google.auth
+from google.auth.transport.requests import Request
 from google.cloud import firestore
 from google.cloud import storage
 from flask import Flask, request, jsonify
@@ -213,10 +215,16 @@ def export_csv_on_demand(request):
                     writer.writerow(row)
 
         # Generar URL firmada en lugar de hacerlo público
+        credentials, project_id = google.auth.default()
+        auth_request = Request()
+        credentials.refresh(auth_request)
+
         signed_url = blob.generate_signed_url(
             version="v4",
             expiration=timedelta(minutes=15),
-            method="GET"
+            method="GET",
+            service_account_email=credentials.service_account_email,
+            access_token=credentials.token
         )
 
         completion_percentage = (completed_docs / total_docs) * 100 if total_docs > 0 else 0

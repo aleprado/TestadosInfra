@@ -167,6 +167,13 @@ resource "google_project_iam_member" "functions_firestore_user_compute_sa" {
   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
+resource "google_project_iam_member" "compute_sa_token_creator" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountTokenCreator"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+
 # Hacer el bucket de exportación privado (antes era público)
 # La función de exportación ahora usa Signed URLs
 
