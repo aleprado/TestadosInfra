@@ -191,7 +191,6 @@ def export_csv_on_demand(request):
 
         total_docs = 0
         completed_docs = 0
-        has_reading = _reading_predicate(include_zero)
 
         with blob.open("wt", newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
@@ -208,9 +207,14 @@ def export_csv_on_demand(request):
                     doc_data = doc.to_dict()
                     total_docs += 1
                     normalized_data = _normalize_export_data(doc_data)
-                    if not has_reading(normalized_data.get('lectura_actual')):
+                    
+                    is_completed = _reading_present_include_zero(normalized_data.get('lectura_actual'))
+                    if is_completed:
+                        completed_docs += 1
+                        
+                    if not include_zero and not is_completed:
                         continue
-                    completed_docs += 1
+                        
                     row = _row_for_export(normalized_data)
                     writer.writerow(row)
 
