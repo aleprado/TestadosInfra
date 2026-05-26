@@ -64,7 +64,7 @@ functions.http('createClientAuth', async (req, res) => {
     console.log(`INFO: Admin verificado: ${callerEmail}`);
 
     // ── 3. Validar parámetros del body ──────────────────────────────────
-    const { email, clienteId } = req.body || {};
+    const { email, clienteId, isTrial } = req.body || {};
 
     if (!email || !clienteId) {
       const missing = [];
@@ -76,7 +76,7 @@ functions.http('createClientAuth', async (req, res) => {
       });
     }
 
-    console.log(`INFO: Creando cliente "${clienteId}" con email "${email}"`);
+    console.log(`INFO: Creando cliente "${clienteId}" con email "${email}" (isTrial: ${!!isTrial})`);
 
     // ── 4. Verificar que clienteId no exista en Firestore ───────────────
     const clienteDoc = await admin.firestore().collection('Clientes').doc(clienteId).get();
@@ -115,10 +115,14 @@ functions.http('createClientAuth', async (req, res) => {
     console.log(`INFO: Usuario creado en Auth - uid: ${userRecord.uid}`);
 
     // ── 8. Crear documento en Firestore: Clientes/{clienteId} ───────────
+    // Atómico: email + metadatos de prueba en una sola operación de escritura.
+    // Esto evita el antipatrón de requerir una segunda llamada desde el frontend.
     await admin.firestore().collection('Clientes').doc(clienteId).set({
       email: email,
+      isTrial: !!isTrial,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    console.log(`INFO: Documento Clientes/${clienteId} creado en Firestore`);
+    console.log(`INFO: Documento Clientes/${clienteId} creado en Firestore (isTrial: ${!!isTrial})`);
 
     // ── 9. Respuesta exitosa ────────────────────────────────────────────
     return res.status(200).json({

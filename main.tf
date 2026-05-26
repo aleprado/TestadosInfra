@@ -338,3 +338,55 @@ import {
   id = "projects/estado-eb18c/releases/cloud.firestore"
   to = google_firebaserules_release.firestore
 }
+
+# ─── Cloud Function: deleteClient (Node.js) ──────────────────────────────────
+
+# Subir el archivo ZIP de la función deleteClient al bucket de funciones
+data "archive_file" "delete_client_src" {
+  type        = "zip"
+  source_dir  = "${path.module}/function/delete_client"
+  output_path = "${path.module}/function/delete_client/delete_client.zip"
+}
+
+resource "google_storage_bucket_object" "upload_delete_client" {
+  name       = "delete_client.zip"
+  bucket     = data.google_storage_bucket.existing_function_bucket.name
+  source     = data.archive_file.delete_client_src.output_path
+  depends_on = [google_storage_bucket.function_bucket]
+}
+
+# Crear la función HTTP deleteClient (Node.js)
+resource "google_cloudfunctions2_function" "delete_client" {
+  name     = "deleteClient"
+  location = var.region
+
+  build_config {
+    runtime     = "nodejs20"
+    entry_point = "deleteClient"
+    source {
+      storage_source {
+        bucket = google_storage_bucket_object.upload_delete_client.bucket
+        object = google_storage_bucket_object.upload_delete_client.name
+      }
+    }
+  }
+
+  service_config {
+    available_memory = "256M"
+  }
+}
+
+# Permitir invocación pública de la función HTTP
+# (la autorización real se verifica internamente mediante Firebase ID Token)
+resource "google_cloud_run_v2_service_iam_member" "invoker_all_users_delete_client" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.delete_client.service_config[0].service
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# NOTA: El permiso roles/firebaseauth.admin para eliminar usuarios de Auth
+# debe asignarse manualmente en IAM & Admin de GCP a la compute SA
+# (igual que se hizo para createClientAuth).
+
